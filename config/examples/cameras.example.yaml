@@ -1,0 +1,19 @@
+cameras:
+  - id: nilescrane
+    name: Niles Crane
+    hostname: nilescrane.local
+    tailscale_ip: 100.64.0.10
+    stream_url: http://nilescrane.local:8050/stream
+    settings_url: http://nilescrane.local:8050/settings
+    health_url: http://nilescrane.local:8050/healthz
+    enabled: true
+    provider: mock
+  - id: daphnemoon
+    name: Daphne Moon
+    hostname: daphnemoon.local
+    tailscale_ip: 100.64.0.11
+    stream_url: http://daphnemoon.local:8050/stream
+    settings_url: http://daphnemoon.local:8050/settings
+    health_url: http://daphnemoon.local:8050/healthz
+    enabled: true
+    provider: mock

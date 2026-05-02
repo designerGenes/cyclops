@@ -1,0 +1,20 @@
+[project]
+name = "cyclops-coordinator"
+version = "0.1.0"
+description = "Cyclops coordinator service"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "fastapi>=0.115.0",
+  "httpx>=0.27.2",
+  "pydantic>=2.9.2",
+  "pydantic-settings>=2.5.2",
+  "pyyaml>=6.0.2",
+  "uvicorn[standard]>=0.31.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cyclops_coordinator"]

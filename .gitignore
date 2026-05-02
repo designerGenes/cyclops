@@ -1,0 +1,16 @@
+.env
+.venv/
+.beads/
+.pytest_cache/
+__pycache__/
+*.pyc
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+*.db
+*.sqlite3
+apps/coordinator-api/src/cyclops_coordinator/static/assets/
+apps/coordinator-api/src/cyclops_coordinator/static/index.html

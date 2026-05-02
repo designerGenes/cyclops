@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyclops.local/schemas/camera-health.schema.json",
+  "title": "CameraHealth",
+  "type": "object",
+  "required": [
+    "camera_id",
+    "status",
+    "provider",
+    "camera_ready",
+    "stream_ready",
+    "last_frame_at",
+    "uptime_seconds",
+    "software_version"
+  ],
+  "properties": {
+    "camera_id": { "type": "string" },
+    "status": { "enum": ["online", "offline", "degraded"] },
+    "provider": { "enum": ["mock", "picamera2"] },
+    "camera_ready": { "type": "boolean" },
+    "stream_ready": { "type": "boolean" },
+    "last_frame_at": { "type": ["string", "null"], "format": "date-time" },
+    "uptime_seconds": { "type": "integer", "minimum": 0 },
+    "software_version": { "type": "string" }
+  },
+  "additionalProperties": false
+}

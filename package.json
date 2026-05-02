@@ -1,0 +1,9 @@
+{
+  "name": "cyclops",
+  "private": true,
+  "packageManager": "pnpm@10.8.1",
+  "scripts": {
+    "test": "pnpm --filter coordinator-web test",
+    "build:web": "pnpm --filter coordinator-web build"
+  }
+}

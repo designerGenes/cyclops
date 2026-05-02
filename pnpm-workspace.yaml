@@ -1,0 +1,3 @@
+packages:
+  - apps/coordinator-web
+  - packages/contracts

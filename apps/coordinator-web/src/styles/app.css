@@ -1,0 +1,143 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, sans-serif;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+body {
+  margin: 0;
+  background: #020617;
+}
+
+a {
+  color: #93c5fd;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid #1e293b;
+}
+
+.toolbar h1,
+.camera-tile h2,
+.camera-tile p {
+  margin: 0;
+}
+
+.tile-list {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.camera-tile {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  border-radius: 16px;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  overflow: hidden;
+}
+
+.camera-tile__header,
+.camera-tile__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+}
+
+.camera-tile__actions,
+.camera-tile__footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.camera-tile__body {
+  min-height: 0;
+  height: 100%;
+  background: #000;
+}
+
+.stream-image,
+.offline-panel {
+  width: 100%;
+  height: 100%;
+}
+
+.stream-image {
+  object-fit: cover;
+  display: block;
+}
+
+.offline-panel {
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+  color: #cbd5e1;
+  background: linear-gradient(180deg, #111827, #1e293b);
+}
+
+.badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #334155;
+  font-size: 0.875rem;
+}
+
+.badge--online {
+  background: #166534;
+}
+
+.badge--offline,
+.badge--error {
+  background: #991b1b;
+}
+
+.badge--degraded {
+  background: #92400e;
+}
+
+.handle-button,
+.resize-handle {
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: inherit;
+  border-radius: 999px;
+  padding: 8px 12px;
+  touch-action: none;
+}
+
+.resize-handle {
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+}
+
+.empty-state {
+  padding: 24px 16px;
+  color: #cbd5e1;
+}
+
+@media (max-width: 767px) {
+  .camera-tile {
+    width: 100%;
+  }
+}

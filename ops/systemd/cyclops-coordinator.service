@@ -1,0 +1,17 @@
+[Unit]
+Description=Cyclops Coordinator Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/cyclops/coordinator.env
+WorkingDirectory=/opt/cyclops/current
+ExecStart=/usr/bin/env uv run uvicorn cyclops_coordinator.app:app --app-dir /opt/cyclops/current/apps/coordinator-api/src --host ${CYCLOPS_BIND_HOST} --port ${CYCLOPS_PORT}
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
