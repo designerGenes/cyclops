@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 
@@ -88,5 +89,16 @@ describe('App', () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('offline-cam-4')).toBeInTheDocument());
     expect(screen.getByText(/stream unavailable/i)).toBeInTheDocument();
+  });
+
+  it('can hide and restore a camera tile', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('tile-list')).toBeInTheDocument());
+    await user.click(screen.getByLabelText('Hide Camera 1'));
+    expect(screen.getByTestId('hidden-tray')).toBeInTheDocument();
+    expect(screen.queryByText('Camera 1')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('show-camera-cam-1'));
+    expect(await screen.findByText('Camera 1')).toBeInTheDocument();
   });
 });

@@ -74,6 +74,16 @@ export function resizeTile(layout: Layout, cameraId: string, heightPx: number): 
   };
 }
 
+export function toggleTileVisibility(layout: Layout, cameraId: string, visible: boolean): Layout {
+  return {
+    ...layout,
+    updated_at: new Date().toISOString(),
+    tiles: layout.tiles.map((tile: LayoutTile) =>
+      tile.camera_id === cameraId ? { ...tile, visible } : tile,
+    ),
+  };
+}
+
 export function mergeTilesWithCameras(cameras: CameraNode[], layout: Layout): Array<CameraNode & { tile: LayoutTile }> {
   const cameraMap = new Map(cameras.map((camera) => [camera.id, camera]));
   return layout.tiles

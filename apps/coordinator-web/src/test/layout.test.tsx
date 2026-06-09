@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CameraNode, Layout } from '@cyclops/contracts';
 import { useLayoutPersistence } from '../hooks/useLayoutPersistence';
-import { LAYOUT_STORAGE_KEY, generateDefaultLayout, moveTile, reconcileLayout, resizeTile } from '../state/layout';
+import { LAYOUT_STORAGE_KEY, generateDefaultLayout, moveTile, reconcileLayout, resizeTile, toggleTileVisibility } from '../state/layout';
 
 const cameras: CameraNode[] = [
   {
@@ -61,6 +61,13 @@ describe('layout state', () => {
   it('updates resize state', () => {
     const layout = generateDefaultLayout(cameras);
     expect(resizeTile(layout, 'a', 999).tiles[0].height_px).toBe(720);
+  });
+
+  it('toggles tile visibility without dropping layout state', () => {
+    const layout = generateDefaultLayout(cameras);
+    const hidden = toggleTileVisibility(layout, 'a', false);
+    expect(hidden.tiles[0].visible).toBe(false);
+    expect(toggleTileVisibility(hidden, 'a', true).tiles[0].visible).toBe(true);
   });
 
   it('cleans up stale layout and appends new cameras', () => {

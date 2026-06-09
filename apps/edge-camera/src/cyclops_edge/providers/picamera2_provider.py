@@ -4,10 +4,12 @@ import logging
 import sys
 import time
 from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
 
 from cyclops_edge import __version__
 from cyclops_edge.camera_provider import ApplySettingsResult, CameraProvider, CameraProviderError
+from cyclops_edge.frame_overlay import annotate_frame
 from cyclops_edge.models import CameraHealth, CameraSettings
 
 logger = logging.getLogger(__name__)
@@ -52,6 +54,7 @@ class Picamera2Provider(CameraProvider):
         self._started_at = time.monotonic()
         self._last_frame_at: datetime | None = None
         self._camera = None
+        self._frame_counter = 0
         if Picamera2 is None:
             raise CameraProviderError("picamera2 runtime is unavailable")
 
@@ -95,7 +98,16 @@ class Picamera2Provider(CameraProvider):
             frame = self._camera.capture_buffer("main")
             image = self._camera.helpers.make_image(frame, self._camera.camera_configuration()["main"])
             self._last_frame_at = datetime.now(UTC)
-            from io import BytesIO
+            self._frame_counter += 1
+            image = annotate_frame(
+                image,
+                camera_label=self.camera_id,
+                frame_number=self._frame_counter,
+                frame_rate=self._settings.frame_rate,
+                width=self._settings.stream_width,
+                height=self._settings.stream_height,
+                captured_at=self._last_frame_at,
+            )
 
             output = BytesIO()
             image.save(output, format="JPEG", quality=self._settings.jpeg_quality)
