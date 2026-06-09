@@ -60,7 +60,10 @@ class HealthPoller:
             response = await self.client.get(camera.health_url, timeout=self.timeout_seconds)
             response.raise_for_status()
             health = CameraHealth.model_validate(response.json())
-            status = "degraded" if (not health.camera_ready or not health.stream_ready or health.status == "degraded") else "online"
+            frame_url = camera.stream_url.replace("/stream", "/api/v1/frame")
+            frame_response = await self.client.get(frame_url, timeout=self.timeout_seconds)
+            frame_ready = frame_response.status_code == 200
+            status = "degraded" if (not health.camera_ready or not frame_ready or health.status == "degraded") else "online"
             record = CameraStatusCacheRecord(
                 camera_id=camera.id,
                 status=status,
@@ -68,7 +71,7 @@ class HealthPoller:
                 software_version=health.software_version,
                 provider=health.provider,
                 camera_ready=health.camera_ready,
-                stream_ready=health.stream_ready,
+                stream_ready=frame_ready,
                 last_frame_at=health.last_frame_at,
                 consecutive_failures=0,
                 updated_at=datetime.now(UTC),

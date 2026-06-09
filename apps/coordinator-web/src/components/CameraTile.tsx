@@ -31,14 +31,18 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
   const [rewindSeconds, setRewindSeconds] = useState(0);
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
   const [controlMessage, setControlMessage] = useState<string | null>(null);
+  const [liveStreamNonce, setLiveStreamNonce] = useState(() => Date.now());
 
   const cameraBaseUrl = camera.stream_url.replace(/\/stream$/, '');
   const frameSrc = paused || rewindSeconds > 0
     ? snapshotUrl ?? `${cameraBaseUrl}/api/v1/frame?seconds_ago=${rewindSeconds}&t=${now}`
-    : `${camera.stream_url}?t=${now}`;
+    : `${camera.stream_url}?v=${liveStreamNonce}`;
 
   useEffect(() => {
     setStreamFailed(false);
+    setPaused(false);
+    setRewindSeconds(0);
+    setLiveStreamNonce(Date.now());
   }, [camera.stream_url, camera.status]);
 
   useEffect(() => {
@@ -164,6 +168,7 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
     setControlMessage(response.restart_required ? 'Camera settings applied and restarted' : 'Camera settings applied');
     setPaused(false);
     setRewindSeconds(0);
+    setLiveStreamNonce(Date.now());
     setNow(Date.now());
   };
 
@@ -171,6 +176,7 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
     const response = await apiClient.restartCameraStream(cameraBaseUrl);
     setPaused(false);
     setRewindSeconds(0);
+    setLiveStreamNonce(Date.now());
     setNow(Date.now());
     setControlMessage(response.detail);
   };
@@ -270,13 +276,13 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
 
       <div className="camera-tile__footer">
         <div className="camera-tile__control-strip">
-          <button type="button" className="control-button" onClick={() => { setPaused((value) => !value); setRewindSeconds(0); setNow(Date.now()); }}>
+          <button type="button" className="control-button" onClick={() => { setPaused((value) => !value); setRewindSeconds(0); setLiveStreamNonce(Date.now()); setNow(Date.now()); }}>
             {paused ? 'Resume' : 'Pause'}
           </button>
           <button type="button" className="control-button" onClick={() => { setPaused(true); setRewindSeconds((value) => value + 5); setNow(Date.now()); }}>
             -5s
           </button>
-          <button type="button" className="control-button" onClick={() => { setPaused(false); setRewindSeconds(0); setNow(Date.now()); setControlMessage('Stream reloaded'); }}>
+          <button type="button" className="control-button" onClick={() => { setPaused(false); setRewindSeconds(0); setLiveStreamNonce(Date.now()); setNow(Date.now()); setControlMessage('Stream reloaded'); }}>
             Reload
           </button>
           <button

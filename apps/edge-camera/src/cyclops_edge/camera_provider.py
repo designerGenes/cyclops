@@ -113,6 +113,7 @@ class RecoveringCameraProvider(CameraProvider):
         self._last_error = "camera provider has not initialized yet"
         self._last_attempt_monotonic = 0.0
         self._lock = Lock()
+        self._frame_lock = Lock()
         self._attempt_recovery(force=True)
 
     def _swap_current(self, provider: CameraProvider, error: str | None = None) -> None:
@@ -175,22 +176,23 @@ class RecoveringCameraProvider(CameraProvider):
         return result
 
     def next_frame(self) -> bytes:
-        provider = self._attempt_recovery()
-        try:
-            return provider.next_frame()
-        except CameraProviderError as exc:
-            # If startup recovery already failed for this request, do not immediately
-            # hammer the camera stack with a second init attempt.
-            if not provider.health().camera_ready:
-                self._mark_unavailable(exc)
-                raise
-            self._mark_unavailable(exc)
-            provider = self._attempt_recovery(force=True)
+        with self._frame_lock:
+            provider = self._attempt_recovery()
             try:
                 return provider.next_frame()
-            except CameraProviderError as retry_exc:
-                self._mark_unavailable(retry_exc)
-                raise retry_exc
+            except CameraProviderError as exc:
+                # If startup recovery already failed for this request, do not immediately
+                # hammer the camera stack with a second init attempt.
+                if not provider.health().camera_ready:
+                    self._mark_unavailable(exc)
+                    raise
+                self._mark_unavailable(exc)
+                provider = self._attempt_recovery(force=True)
+                try:
+                    return provider.next_frame()
+                except CameraProviderError as retry_exc:
+                    self._mark_unavailable(retry_exc)
+                    raise retry_exc
 
     def health(self) -> CameraHealth:
         return self._current.health()

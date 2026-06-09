@@ -58,6 +58,8 @@ def cameras() -> list[CameraNode]:
 async def test_health_polling_marks_online_offline_degraded_correctly(tmp_path: Path) -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         if request.url.host == "cam1":
+            if request.url.path == "/api/v1/frame":
+                return httpx.Response(200, content=b"jpeg")
             return httpx.Response(
                 200,
                 json={
@@ -72,6 +74,8 @@ async def test_health_polling_marks_online_offline_degraded_correctly(tmp_path: 
                 },
             )
         if request.url.host == "cam2":
+            if request.url.path == "/api/v1/frame":
+                return httpx.Response(503)
             return httpx.Response(
                 200,
                 json={
