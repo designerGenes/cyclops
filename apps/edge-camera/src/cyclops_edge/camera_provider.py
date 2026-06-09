@@ -179,6 +179,11 @@ class RecoveringCameraProvider(CameraProvider):
         try:
             return provider.next_frame()
         except CameraProviderError as exc:
+            # If startup recovery already failed for this request, do not immediately
+            # hammer the camera stack with a second init attempt.
+            if not provider.health().camera_ready:
+                self._mark_unavailable(exc)
+                raise
             self._mark_unavailable(exc)
             provider = self._attempt_recovery(force=True)
             try:
@@ -188,8 +193,7 @@ class RecoveringCameraProvider(CameraProvider):
                 raise retry_exc
 
     def health(self) -> CameraHealth:
-        provider = self._attempt_recovery()
-        return provider.health()
+        return self._current.health()
 
     def capabilities_provider(self) -> str:
         return self.provider

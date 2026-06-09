@@ -26,7 +26,7 @@ def test_health_reports_readiness_fields(tmp_path: Path) -> None:
     assert body["provider"] == "mock"
 
 
-def test_health_recovers_provider_after_startup_failure(tmp_path: Path) -> None:
+def test_health_does_not_force_provider_recovery_after_startup_failure(tmp_path: Path) -> None:
     app = create_app(
         EdgeConfig(
             CYCLOPS_SETTINGS_PATH=tmp_path / "settings.json",
@@ -90,6 +90,6 @@ def test_health_recovers_provider_after_startup_failure(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["camera_ready"] is True
-    assert body["status"] == "online"
-    assert attempts["count"] >= 2
+    assert body["camera_ready"] is False
+    assert body["status"] == "degraded"
+    assert attempts["count"] == 1

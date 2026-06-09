@@ -42,10 +42,7 @@ async def _capture_frame(state) -> tuple[bytes, datetime, int | None]:
 async def stream(request: Request):
     state = request.app.state.edge
     provider = state.provider
-    health = provider.health()
     single_frame = request.headers.get("x-cyclops-test-once") == "1"
-    if not health.camera_ready:
-        return JSONResponse(status_code=503, content=ErrorResponse(detail="camera unavailable").model_dump())
 
     try:
         first_frame, captured_at, frame_number = await _capture_frame(state)

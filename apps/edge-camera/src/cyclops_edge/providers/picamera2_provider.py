@@ -66,6 +66,7 @@ class Picamera2Provider(CameraProvider):
             self._camera.configure(config)
             self._camera.start()
         except Exception as exc:  # pragma: no cover - hardware specific
+            self.close()
             logger.exception("Failed to initialize picamera2 provider")
             raise CameraProviderError(str(exc)) from exc
 
