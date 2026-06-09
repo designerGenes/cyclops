@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyclops.local/schemas/camera-settings.schema.json",
+  "title": "CameraSettings",
+  "type": "object",
+  "required": [
+    "rotation_degrees",
+    "hflip",
+    "vflip",
+    "brightness",
+    "contrast",
+    "saturation",
+    "jpeg_quality",
+    "frame_rate",
+    "stream_width",
+    "stream_height"
+  ],
+  "properties": {
+    "rotation_degrees": { "enum": [0, 90, 180, 270] },
+    "hflip": { "type": "boolean" },
+    "vflip": { "type": "boolean" },
+    "brightness": { "type": "number", "minimum": -1.0, "maximum": 1.0 },
+    "contrast": { "type": "number", "minimum": 0.0, "maximum": 2.0 },
+    "saturation": { "type": "number", "minimum": 0.0, "maximum": 2.0 },
+    "jpeg_quality": { "type": "integer", "minimum": 40, "maximum": 95 },
+    "frame_rate": { "type": "integer", "minimum": 1, "maximum": 15 },
+    "stream_width": { "type": "integer", "minimum": 1 },
+    "stream_height": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": false
+}

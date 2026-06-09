@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ camera.name }} Settings</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #111827; color: #f9fafb; }
+      form { display: grid; gap: 12px; max-width: 720px; }
+      label { display: grid; gap: 6px; }
+      input, select, button { font: inherit; padding: 10px; border-radius: 8px; border: 1px solid #374151; }
+      button { background: #2563eb; color: #fff; cursor: pointer; }
+      .status { min-height: 24px; }
+      .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      @media (max-width: 767px) { .row { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <h1>{{ camera.name }} Settings</h1>
+    <p>Phase 1 relies on a trusted private LAN or Tailscale boundary and does not include app-level auth.</p>
+    <form id="settings-form">
+      <div class="row">
+        <label>Rotation Degrees
+          <select name="rotation_degrees">
+            {% for value in [0, 90, 180, 270] %}
+            <option value="{{ value }}" {% if settings.rotation_degrees == value %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>JPEG Quality
+          <input type="number" name="jpeg_quality" min="40" max="95" value="{{ settings.jpeg_quality }}" />
+        </label>
+      </div>
+      <div class="row">
+        <label>Frame Rate
+          <input type="number" name="frame_rate" min="1" max="15" value="{{ settings.frame_rate }}" />
+        </label>
+        <label>Brightness
+          <input type="number" name="brightness" min="-1" max="1" step="0.1" value="{{ settings.brightness }}" />
+        </label>
+      </div>
+      <div class="row">
+        <label>Contrast
+          <input type="number" name="contrast" min="0" max="2" step="0.1" value="{{ settings.contrast }}" />
+        </label>
+        <label>Saturation
+          <input type="number" name="saturation" min="0" max="2" step="0.1" value="{{ settings.saturation }}" />
+        </label>
+      </div>
+      <div class="row">
+        <label>Stream Width
+          <input type="number" name="stream_width" min="1" value="{{ settings.stream_width }}" />
+        </label>
+        <label>Stream Height
+          <input type="number" name="stream_height" min="1" value="{{ settings.stream_height }}" />
+        </label>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" name="hflip" {% if settings.hflip %}checked{% endif %} /> Horizontal Flip</label>
+        <label><input type="checkbox" name="vflip" {% if settings.vflip %}checked{% endif %} /> Vertical Flip</label>
+      </div>
+      <button type="submit">Apply Settings</button>
+      <div class="status" id="status"></div>
+    </form>
+    <script>
+      const form = document.getElementById('settings-form');
+      const statusNode = document.getElementById('status');
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(form);
+        const payload = {
+          rotation_degrees: Number(formData.get('rotation_degrees')),
+          hflip: formData.get('hflip') === 'on',
+          vflip: formData.get('vflip') === 'on',
+          brightness: Number(formData.get('brightness')),
+          contrast: Number(formData.get('contrast')),
+          saturation: Number(formData.get('saturation')),
+          jpeg_quality: Number(formData.get('jpeg_quality')),
+          frame_rate: Number(formData.get('frame_rate')),
+          stream_width: Number(formData.get('stream_width')),
+          stream_height: Number(formData.get('stream_height')),
+        };
+        statusNode.textContent = 'Applying…';
+        try {
+          const response = await fetch('/api/v1/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const body = await response.json();
+          if (!response.ok) {
+            statusNode.textContent = `Failed: ${body.detail ?? 'unknown error'}`;
+            return;
+          }
+          statusNode.textContent = body.restart_required ? 'Applied; camera pipeline restarted.' : 'Applied successfully.';
+        } catch (error) {
+          statusNode.textContent = `Failed: ${error}`;
+        }
+      });
+    </script>
+  </body>
+</html>

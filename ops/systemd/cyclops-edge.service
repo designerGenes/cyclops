@@ -1,0 +1,17 @@
+[Unit]
+Description=Cyclops Edge Camera Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/cyclops/edge.env
+WorkingDirectory=/opt/cyclops/current
+ExecStart=/usr/bin/env uv run uvicorn cyclops_edge.app:app --app-dir /opt/cyclops/current/apps/edge-camera/src --host ${CYCLOPS_BIND_HOST} --port ${CYCLOPS_PORT}
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

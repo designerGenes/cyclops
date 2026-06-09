@@ -1,0 +1,19 @@
+cameras:
+  - id: camera-01
+    name: Niles Crane
+    hostname: camera-01.local
+    tailscale_ip: 100.64.0.10
+    stream_url: http://camera-01.local:8050/stream
+    settings_url: http://camera-01.local:8050/settings
+    health_url: http://camera-01.local:8050/healthz
+    enabled: true
+    provider: mock
+  - id: camera-02
+    name: Daphne Moon
+    hostname: camera-02.local
+    tailscale_ip: 100.64.0.11
+    stream_url: http://camera-02.local:8050/stream
+    settings_url: http://camera-02.local:8050/settings
+    health_url: http://camera-02.local:8050/healthz
+    enabled: true
+    provider: mock

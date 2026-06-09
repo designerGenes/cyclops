@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyclops.local/schemas/camera-node.schema.json",
+  "title": "CameraNode",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "hostname",
+    "tailscale_ip",
+    "stream_url",
+    "settings_url",
+    "health_url",
+    "status",
+    "last_seen_at",
+    "software_version",
+    "capabilities"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "hostname": { "type": ["string", "null"] },
+    "tailscale_ip": { "type": ["string", "null"] },
+    "stream_url": { "type": "string", "format": "uri" },
+    "settings_url": { "type": "string", "format": "uri" },
+    "health_url": { "type": "string", "format": "uri" },
+    "status": { "enum": ["unknown", "online", "offline", "degraded"] },
+    "last_seen_at": { "type": ["string", "null"], "format": "date-time" },
+    "software_version": { "type": ["string", "null"] },
+    "capabilities": {
+      "type": "object",
+      "required": [
+        "provider",
+        "stream_kind",
+        "supports_settings",
+        "supports_future_analytics_ingest"
+      ],
+      "properties": {
+        "provider": { "enum": ["mock", "picamera2"] },
+        "stream_kind": { "const": "mjpeg" },
+        "supports_settings": { "type": "boolean" },
+        "supports_future_analytics_ingest": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

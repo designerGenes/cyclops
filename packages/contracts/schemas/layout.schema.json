@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyclops.local/schemas/layout.schema.json",
+  "title": "Layout",
+  "type": "object",
+  "required": ["layout_id", "tiles", "updated_at"],
+  "properties": {
+    "layout_id": { "const": "default" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "tiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["camera_id", "order", "height_px", "visible"],
+        "properties": {
+          "camera_id": { "type": "string" },
+          "order": { "type": "integer", "minimum": 0 },
+          "height_px": { "type": "integer", "minimum": 180, "maximum": 720 },
+          "visible": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
