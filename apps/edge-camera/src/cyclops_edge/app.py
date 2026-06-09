@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.templating import Jinja2Templates
 
-from cyclops_edge.camera_provider import CameraProvider, CameraProviderError, UnavailableCameraProvider
+from cyclops_edge.camera_provider import CameraProvider, CameraProviderError, RecoveringCameraProvider
 from cyclops_edge.config import EdgeConfig, get_config
 from cyclops_edge.models import CameraSettings
 from cyclops_edge.providers.mock_provider import MockCameraProvider
@@ -44,11 +44,12 @@ def create_app(config: EdgeConfig | None = None) -> FastAPI:
     templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
     settings_store = SettingsStore(config.settings_path, config.default_settings())
     settings = settings_store.load()
-    try:
-        provider = create_provider(config, settings)
-    except CameraProviderError as exc:
-        logger.warning("Provider initialization failed, using unavailable provider: %s", exc)
-        provider = UnavailableCameraProvider(config.camera_id, config.camera_provider, settings, str(exc))
+    provider = RecoveringCameraProvider(
+        factory=lambda active_settings: create_provider(config, active_settings),
+        camera_id=config.camera_id,
+        provider=config.camera_provider,
+        settings=settings,
+    )
     app.state.edge = EdgeState(
         config=config,
         settings_store=settings_store,

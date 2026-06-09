@@ -6,9 +6,9 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from cyclops_edge.app import create_app
-from cyclops_edge.camera_provider import CameraProviderError
+from cyclops_edge.camera_provider import CameraProviderError, RecoveringCameraProvider
 from cyclops_edge.config import EdgeConfig
-from cyclops_edge.models import CameraHealth
+from cyclops_edge.models import CameraHealth, CameraSettings
 
 
 def test_stream_returns_mjpeg_content_type(tmp_path: Path) -> None:
@@ -133,3 +133,141 @@ def test_stream_returns_503_when_first_frame_fails(tmp_path: Path) -> None:
 
     assert response.status_code == 503
     assert response.json() == {"detail": "stream unavailable"}
+
+
+def test_stream_recovers_after_provider_retries(tmp_path: Path) -> None:
+    app = create_app(
+        EdgeConfig(
+            CYCLOPS_SETTINGS_PATH=tmp_path / "settings.json",
+            CYCLOPS_CAMERA_PROVIDER="mock",
+        )
+    )
+    original_provider = app.state.edge.provider
+    attempts = {"count": 0}
+
+    class RetryableProvider:
+        def __init__(self, settings: CameraSettings) -> None:
+            self._settings = settings
+
+        def get_settings(self):
+            return self._settings
+
+        def apply_settings(self, settings):
+            self._settings = settings
+            return original_provider.apply_settings(settings)
+
+        def next_frame(self) -> bytes:
+            return b"jpeg-bytes"
+
+        def health(self) -> CameraHealth:
+            return CameraHealth(
+                camera_id="camera-1",
+                status="online",
+                provider="mock",
+                camera_ready=True,
+                stream_ready=True,
+                last_frame_at=datetime.now(),
+                uptime_seconds=1,
+                software_version="test",
+            )
+
+        def capabilities_provider(self) -> str:
+            return "mock"
+
+        def last_frame_at(self):
+            return None
+
+        def close(self) -> None:
+            return None
+
+    def flaky_factory(settings: CameraSettings):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise CameraProviderError("camera booting")
+        return RetryableProvider(settings)
+
+    app.state.edge.provider = RecoveringCameraProvider(
+        factory=flaky_factory,
+        camera_id="camera-1",
+        provider="mock",
+        settings=original_provider.get_settings(),
+        retry_interval_seconds=0,
+    )
+    client = TestClient(app)
+
+    with client.stream("GET", "/stream", headers={"x-cyclops-test-once": "1"}) as response:
+        chunk = next(response.iter_bytes())
+        assert response.status_code == 200
+        assert b"--frame" in chunk
+
+    assert attempts["count"] >= 2
+
+
+def test_stream_recovers_after_runtime_failure(tmp_path: Path) -> None:
+    app = create_app(
+        EdgeConfig(
+            CYCLOPS_SETTINGS_PATH=tmp_path / "settings.json",
+            CYCLOPS_CAMERA_PROVIDER="mock",
+        )
+    )
+    original_provider = app.state.edge.provider
+    attempts = {"count": 0}
+
+    class ProviderThatFailsOnce:
+        def __init__(self, settings: CameraSettings) -> None:
+            self._settings = settings
+            self._calls = 0
+
+        def get_settings(self):
+            return self._settings
+
+        def apply_settings(self, settings):
+            self._settings = settings
+            return original_provider.apply_settings(settings)
+
+        def next_frame(self) -> bytes:
+            self._calls += 1
+            if attempts["count"] == 1 and self._calls == 1:
+                raise CameraProviderError("camera hiccup")
+            return b"jpeg-bytes"
+
+        def health(self) -> CameraHealth:
+            return CameraHealth(
+                camera_id="camera-1",
+                status="online",
+                provider="mock",
+                camera_ready=True,
+                stream_ready=True,
+                last_frame_at=datetime.now(),
+                uptime_seconds=1,
+                software_version="test",
+            )
+
+        def capabilities_provider(self) -> str:
+            return "mock"
+
+        def last_frame_at(self):
+            return None
+
+        def close(self) -> None:
+            return None
+
+    def reinitializing_factory(settings: CameraSettings):
+        attempts["count"] += 1
+        return ProviderThatFailsOnce(settings)
+
+    app.state.edge.provider = RecoveringCameraProvider(
+        factory=reinitializing_factory,
+        camera_id="camera-1",
+        provider="mock",
+        settings=original_provider.get_settings(),
+        retry_interval_seconds=0,
+    )
+    client = TestClient(app)
+
+    with client.stream("GET", "/stream", headers={"x-cyclops-test-once": "1"}) as response:
+        chunk = next(response.iter_bytes())
+        assert response.status_code == 200
+        assert b"--frame" in chunk
+
+    assert attempts["count"] >= 2

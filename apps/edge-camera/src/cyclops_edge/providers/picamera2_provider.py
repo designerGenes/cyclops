@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import sys
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 
 from cyclops_edge import __version__
 from cyclops_edge.camera_provider import ApplySettingsResult, CameraProvider, CameraProviderError
@@ -10,10 +12,37 @@ from cyclops_edge.models import CameraHealth, CameraSettings
 
 logger = logging.getLogger(__name__)
 
-try:  # pragma: no cover - import depends on runtime
-    from picamera2 import Picamera2  # type: ignore
-except Exception:  # pragma: no cover - import depends on runtime
-    Picamera2 = None
+
+def _load_picamera2():
+    try:  # pragma: no cover - import depends on runtime
+        from picamera2 import Picamera2 as runtime_picamera2  # type: ignore
+
+        return runtime_picamera2
+    except Exception:
+        pass
+
+    version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    fallback_paths = [
+        Path(f"/usr/lib/{version}/dist-packages"),
+        Path("/usr/lib/python3/dist-packages"),
+    ]
+    for fallback_path in fallback_paths:
+        if not fallback_path.exists():
+            continue
+        fallback = str(fallback_path)
+        if fallback not in sys.path:
+            sys.path.append(fallback)
+        try:  # pragma: no cover - import depends on runtime
+            from picamera2 import Picamera2 as runtime_picamera2  # type: ignore
+
+            logger.info("Loaded picamera2 from system packages at %s", fallback_path)
+            return runtime_picamera2
+        except Exception:
+            continue
+    return None
+
+
+Picamera2 = _load_picamera2()
 
 
 class Picamera2Provider(CameraProvider):
@@ -93,3 +122,13 @@ class Picamera2Provider(CameraProvider):
 
     def last_frame_at(self) -> datetime | None:
         return self._last_frame_at
+
+    def close(self) -> None:
+        if self._camera is None:  # pragma: no cover - defensive
+            return
+        try:
+            self._camera.stop()
+        except Exception:  # pragma: no cover - hardware specific
+            logger.exception("Failed to stop picamera2 provider cleanly")
+        finally:
+            self._camera = None
