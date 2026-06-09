@@ -21,5 +21,5 @@ def test_annotate_frame_draws_live_metadata() -> None:
     )
 
     assert annotated.size == (320, 180)
-    assert annotated.getpixel((30, 30)) != (0, 0, 0)
+    assert annotated.getpixel((160, 24)) != (0, 0, 0)
     assert annotated.getpixel((30, 150)) != (0, 0, 0)

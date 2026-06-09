@@ -34,3 +34,14 @@ def test_edge_deploy_script_uses_sudo_for_systemd_actions() -> None:
     assert 'sudo -n systemctl daemon-reload' in script
     assert 'sudo -n systemctl enable cyclops-edge.service' in script
     assert 'sudo -n systemctl restart cyclops-edge.service' in script
+
+
+def test_coordinator_deploy_script_matches_hardened_release_pattern() -> None:
+    script_path = Path(__file__).resolve().parents[3] / "ops" / "deploy" / "deploy-coordinator.sh"
+    script = script_path.read_text()
+
+    assert 'REMOTE_RELEASE_DIR="/opt/cyclops/releases/cyclops-${VERSION}"' in script
+    assert r'UV_BIN=\$(command -v uv || true)' in script
+    assert 'sudo -n systemctl daemon-reload' in script
+    assert 'sudo -n systemctl enable cyclops-coordinator.service' in script
+    assert 'sudo -n systemctl restart cyclops-coordinator.service' in script

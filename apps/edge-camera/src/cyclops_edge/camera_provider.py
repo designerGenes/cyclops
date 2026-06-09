@@ -44,6 +44,12 @@ class CameraProvider(ABC):
     @abstractmethod
     def last_frame_at(self) -> datetime | None: ...
 
+    def last_frame_number(self) -> int | None:
+        return None
+
+    def restart(self) -> None:
+        return None
+
     def close(self) -> None:
         return None
 
@@ -193,3 +199,19 @@ class RecoveringCameraProvider(CameraProvider):
 
     def close(self) -> None:
         self._current.close()
+
+    def last_frame_number(self) -> int | None:
+        getter = getattr(self._current, "last_frame_number", None)
+        return getter() if callable(getter) else None
+
+    def restart(self) -> None:
+        with self._lock:
+            self._current.close()
+            self._current = UnavailableCameraProvider(
+                camera_id=self.camera_id,
+                provider=self.provider,
+                settings=self._settings,
+                reason="camera restart requested",
+            )
+            self._last_attempt_monotonic = 0.0
+        self._attempt_recovery(force=True)

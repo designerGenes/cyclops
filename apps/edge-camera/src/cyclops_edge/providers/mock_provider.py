@@ -79,3 +79,6 @@ class MockCameraProvider(CameraProvider):
 
     def last_frame_at(self) -> datetime | None:
         return self._last_frame_at
+
+    def last_frame_number(self) -> int | None:
+        return self._frame_counter

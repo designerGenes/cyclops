@@ -41,6 +41,55 @@ def test_stream_emits_boundary(tmp_path: Path) -> None:
         assert b"--frame" in chunk
 
 
+def test_frame_snapshot_returns_jpeg_and_metadata(tmp_path: Path) -> None:
+    app = create_app(
+        EdgeConfig(
+            CYCLOPS_SETTINGS_PATH=tmp_path / "settings.json",
+            CYCLOPS_CAMERA_PROVIDER="mock",
+        )
+    )
+    client = TestClient(app)
+
+    response = client.get("/api/v1/frame")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert "x-cyclops-captured-at" in response.headers
+    assert response.content.startswith(b"\xff\xd8\xff")
+
+
+def test_frame_snapshot_can_return_buffered_prior_frame(tmp_path: Path) -> None:
+    app = create_app(
+        EdgeConfig(
+            CYCLOPS_SETTINGS_PATH=tmp_path / "settings.json",
+            CYCLOPS_CAMERA_PROVIDER="mock",
+        )
+    )
+    client = TestClient(app)
+
+    first = client.get("/api/v1/frame")
+    buffered = client.get("/api/v1/frame", params={"seconds_ago": 5})
+
+    assert first.status_code == 200
+    assert buffered.status_code == 200
+    assert buffered.content.startswith(b"\xff\xd8\xff")
+
+
+def test_stream_restart_endpoint_returns_success(tmp_path: Path) -> None:
+    app = create_app(
+        EdgeConfig(
+            CYCLOPS_SETTINGS_PATH=tmp_path / "settings.json",
+            CYCLOPS_CAMERA_PROVIDER="mock",
+        )
+    )
+    client = TestClient(app)
+
+    response = client.post("/api/v1/stream/restart")
+
+    assert response.status_code == 200
+    assert response.json() == {"detail": "stream restarted"}
+
+
 def test_stream_stops_cleanly_when_provider_fails_after_start(tmp_path: Path) -> None:
     app = create_app(
         EdgeConfig(

@@ -6,10 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 
 from cyclops_edge.camera_provider import CameraProvider, CameraProviderError, RecoveringCameraProvider
 from cyclops_edge.config import EdgeConfig, get_config
+from cyclops_edge.frame_store import FrameStore
 from cyclops_edge.models import CameraSettings
 from cyclops_edge.providers.mock_provider import MockCameraProvider
 from cyclops_edge.providers.picamera2_provider import Picamera2Provider
@@ -28,6 +30,7 @@ class EdgeState:
     settings_store: SettingsStore
     provider: CameraProvider
     apply_lock: asyncio.Lock
+    frame_store: FrameStore
 
 
 def create_provider(config: EdgeConfig, settings: CameraSettings) -> CameraProvider:
@@ -41,6 +44,13 @@ def create_provider(config: EdgeConfig, settings: CameraSettings) -> CameraProvi
 def create_app(config: EdgeConfig | None = None) -> FastAPI:
     config = config or get_config()
     app = FastAPI(title="Cyclops Edge Camera", version="0.1.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
     settings_store = SettingsStore(config.settings_path, config.default_settings())
     settings = settings_store.load()
@@ -55,6 +65,7 @@ def create_app(config: EdgeConfig | None = None) -> FastAPI:
         settings_store=settings_store,
         provider=provider,
         apply_lock=asyncio.Lock(),
+        frame_store=FrameStore(),
     )
     app.state.templates = templates
     app.include_router(stream_router)

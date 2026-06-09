@@ -64,5 +64,10 @@ class SettingsUpdateResponse(BaseModel):
     restart_performed: bool
 
 
+class FrameMetadata(BaseModel):
+    captured_at: datetime
+    frame_number: int | None = None
+
+
 class ErrorResponse(BaseModel):
     detail: str

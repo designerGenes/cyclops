@@ -1,4 +1,4 @@
-import type { CameraNode, Layout } from '@cyclops/contracts';
+import type { CameraNode, CameraSettings, Layout } from '@cyclops/contracts';
 
 async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
@@ -21,5 +21,15 @@ export const apiClient = {
     requestJson<Layout>('/api/v1/layouts/default', {
       method: 'PUT',
       body: JSON.stringify(layout),
+    }),
+  getCameraSettings: (baseUrl: string) => requestJson<CameraSettings>(`${baseUrl}/api/v1/settings`),
+  updateCameraSettings: (baseUrl: string, settings: CameraSettings) =>
+    requestJson<{ settings: CameraSettings; restart_required: boolean; restart_performed: boolean }>(`${baseUrl}/api/v1/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
+  restartCameraStream: (baseUrl: string) =>
+    requestJson<{ detail: string }>(`${baseUrl}/api/v1/stream/restart`, {
+      method: 'POST',
     }),
 };

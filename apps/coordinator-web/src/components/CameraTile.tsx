@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { CameraNode, LayoutTile } from '@cyclops/contracts';
+import type { CameraNode, CameraSettings, LayoutTile } from '@cyclops/contracts';
+import { apiClient } from '../api/client';
 import { OfflineTile } from './OfflineTile';
 
 type PictureInPictureWindow = Window & {
@@ -24,6 +25,17 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
   const resizeStart = useRef<{ y: number; height: number } | null>(null);
   const [streamFailed, setStreamFailed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [settings, setSettings] = useState<CameraSettings | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [rewindSeconds, setRewindSeconds] = useState(0);
+  const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
+  const [controlMessage, setControlMessage] = useState<string | null>(null);
+
+  const cameraBaseUrl = camera.stream_url.replace(/\/stream$/, '');
+  const frameSrc = paused || rewindSeconds > 0
+    ? snapshotUrl ?? `${cameraBaseUrl}/api/v1/frame?seconds_ago=${rewindSeconds}&t=${now}`
+    : `${camera.stream_url}?t=${now}`;
 
   useEffect(() => {
     setStreamFailed(false);
@@ -33,6 +45,31 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    apiClient.getCameraSettings(cameraBaseUrl).then((next) => {
+      if (active) setSettings(next);
+    }).catch(() => {
+      if (active) setControlMessage('Camera settings unavailable');
+    });
+    return () => {
+      active = false;
+    };
+  }, [cameraBaseUrl]);
+
+  useEffect(() => {
+    if (!paused && rewindSeconds === 0) {
+      setSnapshotUrl(null);
+      return;
+    }
+    let active = true;
+    const nextUrl = `${cameraBaseUrl}/api/v1/frame?seconds_ago=${rewindSeconds}&t=${Date.now()}`;
+    if (active) setSnapshotUrl(nextUrl);
+    return () => {
+      active = false;
+    };
+  }, [cameraBaseUrl, paused, rewindSeconds, now]);
 
   const statusClass = camera.status === 'online' ? 'badge--online' : camera.status === 'degraded' ? 'badge--degraded' : 'badge--offline';
   const showOffline = camera.status !== 'online' || streamFailed;
@@ -58,7 +95,7 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
       header.style.borderBottom = '1px solid #1e293b';
       header.innerHTML = `<strong>${camera.name}</strong><div style="font-size:12px;color:#cbd5e1;">${heartbeatText}</div>`;
       const image = targetWindow.document.createElement('img');
-      image.src = camera.stream_url;
+      image.src = frameSrc;
       image.alt = `${camera.name} live stream`;
       image.style.width = '100%';
       image.style.height = '100%';
@@ -109,6 +146,35 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
     onResize(camera.id, resizeStart.current.height + (event.clientY - resizeStart.current.y));
   };
 
+  const requestFullscreen = async () => {
+    const tile = document.querySelector(`[data-testid="tile-${camera.id}"]`) as HTMLElement | null;
+    if (!tile) return;
+    if (document.fullscreenElement === tile) {
+      await document.exitFullscreen();
+      return;
+    }
+    await tile.requestFullscreen();
+  };
+
+  const applyQuickSettings = async (patch: Partial<CameraSettings>) => {
+    if (!settings) return;
+    const next = { ...settings, ...patch };
+    const response = await apiClient.updateCameraSettings(cameraBaseUrl, next);
+    setSettings(response.settings);
+    setControlMessage(response.restart_required ? 'Camera settings applied and restarted' : 'Camera settings applied');
+    setPaused(false);
+    setRewindSeconds(0);
+    setNow(Date.now());
+  };
+
+  const restartStream = async () => {
+    const response = await apiClient.restartCameraStream(cameraBaseUrl);
+    setPaused(false);
+    setRewindSeconds(0);
+    setNow(Date.now());
+    setControlMessage(response.detail);
+  };
+
   return (
     <article
       className="camera-tile"
@@ -140,15 +206,11 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
           >
             ↓
           </button>
-          <button
-            type="button"
-            aria-label={`Picture in picture ${camera.name}`}
-            className="control-button"
-            onClick={() => {
-              void openFloatingView();
-            }}
-          >
+          <button type="button" aria-label={`Picture in picture ${camera.name}`} className="control-button" onClick={() => { void openFloatingView(); }}>
             PiP
+          </button>
+          <button type="button" aria-label={`Fullscreen ${camera.name}`} className="control-button" onClick={() => { void requestFullscreen(); }}>
+            Full
           </button>
           <button
             type="button"
@@ -179,17 +241,23 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
         {showOffline ? (
           <OfflineTile camera={{ ...camera, status: streamFailed ? 'offline' : camera.status }} />
         ) : (
-          <img
-            src={camera.stream_url}
-            alt={`${camera.name} live stream`}
-            className="stream-image"
-            onError={() => setStreamFailed(true)}
-          />
+            <img
+              src={frameSrc}
+              alt={`${camera.name} live stream`}
+              className="stream-image"
+              onError={() => setStreamFailed(true)}
+            />
         )}
           <div className="stream-overlay">
             <div className="live-pill">
               <span className="live-pill__dot" />
-              <span>{showOffline ? 'Reconnecting' : `Live ${new Date(now).toLocaleTimeString([], { hour12: false })}`}</span>
+              <span>
+                {showOffline
+                  ? 'Reconnecting'
+                  : paused
+                    ? `Paused ${rewindSeconds > 0 ? `-${rewindSeconds}s` : ''}`
+                    : `Live ${new Date(now).toLocaleTimeString([], { hour12: false })}`}
+              </span>
             </div>
             <div className="stream-overlay__meta">
               <span>{camera.hostname ?? camera.tailscale_ip ?? camera.id}</span>
@@ -201,9 +269,89 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
       </div>
 
       <div className="camera-tile__footer">
+        <div className="camera-tile__control-strip">
+          <button type="button" className="control-button" onClick={() => { setPaused((value) => !value); setRewindSeconds(0); setNow(Date.now()); }}>
+            {paused ? 'Resume' : 'Pause'}
+          </button>
+          <button type="button" className="control-button" onClick={() => { setPaused(true); setRewindSeconds((value) => value + 5); setNow(Date.now()); }}>
+            -5s
+          </button>
+          <button type="button" className="control-button" onClick={() => { setPaused(false); setRewindSeconds(0); setNow(Date.now()); setControlMessage('Stream reloaded'); }}>
+            Reload
+          </button>
+          <button type="button" className="control-button" onClick={() => { void restartStream(); }}>
+            Restart
+          </button>
+          <button
+            type="button"
+            className="control-button"
+            aria-label={`Open camera controls ${camera.name}`}
+            onClick={() => setSettingsOpen((value) => !value)}
+          >
+            Camera
+          </button>
+        </div>
         <a href={camera.settings_url} target="_blank" rel="noreferrer">Open Settings</a>
         <a href={camera.stream_url} target="_blank" rel="noreferrer">Open Stream</a>
       </div>
+
+      {settingsOpen && settings ? (
+        <div className="camera-tile__settings-panel">
+          <div className="camera-tile__settings-grid">
+            <label>
+              Resolution
+              <select
+                value={`${settings.stream_width}x${settings.stream_height}`}
+                onChange={(event) => {
+                  const [width, height] = event.target.value.split('x').map(Number);
+                  void applyQuickSettings({ stream_width: width, stream_height: height });
+                }}
+              >
+                <option value="640x360">640x360</option>
+                <option value="960x540">960x540</option>
+                <option value="1280x720">1280x720</option>
+              </select>
+            </label>
+            <label>
+              Codec
+              <select value="MJPEG" onChange={() => setControlMessage('MJPEG is the only current stream codec in phase 1')}>
+                <option value="MJPEG">MJPEG</option>
+                <option value="H264">H264 (planned)</option>
+              </select>
+            </label>
+            <label>
+              Frame rate
+              <select value={settings.frame_rate} onChange={(event) => { void applyQuickSettings({ frame_rate: Number(event.target.value) }); }}>
+                <option value={3}>3 fps</option>
+                <option value={5}>5 fps</option>
+                <option value={8}>8 fps</option>
+                <option value={10}>10 fps</option>
+              </select>
+            </label>
+            <label>
+              Quality
+              <select value={settings.jpeg_quality} onChange={(event) => { void applyQuickSettings({ jpeg_quality: Number(event.target.value) }); }}>
+                <option value={60}>60</option>
+                <option value={75}>75</option>
+                <option value={85}>85</option>
+                <option value={92}>92</option>
+              </select>
+            </label>
+            <label>
+              Tile height
+              <input
+                type="range"
+                min={180}
+                max={720}
+                step={10}
+                value={tile.height_px}
+                onChange={(event) => onResize(camera.id, Number(event.target.value))}
+              />
+            </label>
+          </div>
+          {controlMessage ? <div className="camera-tile__message">{controlMessage}</div> : null}
+        </div>
+      ) : null}
 
       <button
         type="button"

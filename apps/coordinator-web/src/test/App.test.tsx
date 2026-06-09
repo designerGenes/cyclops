@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
@@ -100,5 +100,17 @@ describe('App', () => {
     expect(screen.queryByText('Camera 1')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('show-camera-cam-1'));
     expect(await screen.findByText('Camera 1')).toBeInTheDocument();
+  });
+
+  it('shows camera controls and quick settings', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('tile-list')).toBeInTheDocument());
+    const firstTile = screen.getByTestId('tile-cam-1');
+    await user.click(screen.getByRole('button', { name: 'Open camera controls Camera 1' }));
+    expect(screen.getByText('Resolution')).toBeInTheDocument();
+    expect(screen.getByText('Codec')).toBeInTheDocument();
+    expect(within(firstTile).getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    expect(within(firstTile).getByRole('button', { name: 'Restart' })).toBeInTheDocument();
   });
 });
