@@ -172,15 +172,6 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
     setNow(Date.now());
   };
 
-  const restartStream = async () => {
-    const response = await apiClient.restartCameraStream(cameraBaseUrl);
-    setPaused(false);
-    setRewindSeconds(0);
-    setLiveStreamNonce(Date.now());
-    setNow(Date.now());
-    setControlMessage(response.detail);
-  };
-
   return (
     <article
       className="camera-tile"
@@ -339,16 +330,6 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
                 <option value={85}>85</option>
                 <option value={92}>92</option>
               </select>
-            </label>
-            <label>
-              Service
-              <button
-                type="button"
-                className="control-button"
-                onClick={() => { void restartStream(); }}
-              >
-                Restart camera service
-              </button>
             </label>
             <label>
               Tile height

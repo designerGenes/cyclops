@@ -111,6 +111,6 @@ describe('App', () => {
     expect(screen.getByText('Resolution')).toBeInTheDocument();
     expect(screen.getByText('Codec')).toBeInTheDocument();
     expect(within(firstTile).getByRole('button', { name: 'Pause' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Service' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Service' })).not.toBeInTheDocument();
   });
 });
