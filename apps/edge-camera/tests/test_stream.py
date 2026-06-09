@@ -22,6 +22,10 @@ def test_stream_returns_mjpeg_content_type(tmp_path: Path) -> None:
     with client.stream("GET", "/stream", headers={"x-cyclops-test-once": "1"}) as response:
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("multipart/x-mixed-replace; boundary=frame")
+        assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
+        assert response.headers["pragma"] == "no-cache"
+        assert response.headers["expires"] == "0"
+        assert response.headers["x-accel-buffering"] == "no"
 
 
 def test_stream_emits_boundary(tmp_path: Path) -> None:
