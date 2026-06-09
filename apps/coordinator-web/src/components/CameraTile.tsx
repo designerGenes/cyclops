@@ -279,9 +279,6 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
           <button type="button" className="control-button" onClick={() => { setPaused(false); setRewindSeconds(0); setNow(Date.now()); setControlMessage('Stream reloaded'); }}>
             Reload
           </button>
-          <button type="button" className="control-button" onClick={() => { void restartStream(); }}>
-            Restart
-          </button>
           <button
             type="button"
             className="control-button"
@@ -336,6 +333,16 @@ export function CameraTile({ camera, tile, index, total, fillViewport = false, o
                 <option value={85}>85</option>
                 <option value={92}>92</option>
               </select>
+            </label>
+            <label>
+              Service
+              <button
+                type="button"
+                className="control-button"
+                onClick={() => { void restartStream(); }}
+              >
+                Restart camera service
+              </button>
             </label>
             <label>
               Tile height
