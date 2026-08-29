@@ -57,6 +57,25 @@ def sd_notify(msg: str) -> None:
         pass
 
 
+def lan_ip() -> str | None:
+    """This node's LAN IPv4 (not Tailscale, not Docker/link-local), so the
+    brain can pull RTSP over the LAN instead of encrypting every frame
+    through tailscaled — a big CPU (and therefore heat) saving on the eye."""
+    try:
+        out = subprocess.run(["hostname", "-I"], capture_output=True,
+                             text=True, timeout=5).stdout
+    except Exception:
+        return None
+    for ip in out.split():
+        if ip.count(".") != 3:
+            continue
+        first = int(ip.split(".")[0])
+        if first in (100, 127, 172, 169):   # tailnet CGNAT / loopback / docker / link-local
+            continue
+        return ip
+    return None
+
+
 def post_json(url: str, payload: dict, timeout: float = 8.0) -> dict | None:
     req = urllib.request.Request(
         url, data=json.dumps(payload).encode(), method="POST",
@@ -83,6 +102,7 @@ class Agent:
             "name": c["name"],
             "token": c["enroll_token"],
             "host": c.get("advertise_host") or socket.gethostname(),
+            "lan_host": lan_ip() or "",
             "rtsp_port": 8554,
             "streams": {"primary": "cam", "detect": "detect"},
         }
@@ -100,6 +120,7 @@ class Agent:
             "throttled": hex(thermal.read_throttled()),
             "tier": self.gov.effective_tier()["name"],
             "uptime_s": int(time.monotonic() - START),
+            "lan_host": lan_ip() or "",
         }
         try:
             post_json(f"{c['cyclops_url']}/api/nodes/heartbeat", payload)

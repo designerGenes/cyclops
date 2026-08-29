@@ -33,10 +33,12 @@ class Watcher(threading.Thread):
         self.last_person_at = 0.0          # UI presence latch (debounced)
 
     def run(self) -> None:
-        url = self.node.detect_rtsp
         backoff = 2.0
         period = 1.0 / max(0.5, self.pool.cfg.detect.sample_fps)
         while not self.stop_flag.is_set():
+            # Re-read each reconnect: the brain may have switched the node
+            # between its LAN and tailnet routes.
+            url = self.node.detect_rtsp
             cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
             if not cap.isOpened():
                 cap.release()
@@ -104,6 +106,15 @@ class DetectorPool:
                     w = Watcher(node, self)
                     self.watchers[node.name] = w
                     w.start()
+
+    def restart_watcher(self, name: str) -> None:
+        """Bounce a watcher so it picks up the node's current RTSP route
+        (e.g. after the registry learned or changed its LAN address)."""
+        with self._lock:
+            w = self.watchers.get(name)
+            if w:
+                w.stop_flag.set()
+        self.sync()
 
     def status(self) -> dict[str, float]:
         return {name: w.last_frame_at for name, w in self.watchers.items()}

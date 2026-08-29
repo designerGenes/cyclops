@@ -14,6 +14,7 @@ rtmp: no
 hls: no
 webrtc: no
 srt: no
+moq: no
 playback: no
 metrics: no
 
@@ -23,16 +24,16 @@ paths:
     rpiCameraCodec: hardwareH264
     rpiCameraWidth: 1280
     rpiCameraHeight: 720
-    rpiCameraFPS: 10
-    rpiCameraBitrate: 900000
-    rpiCameraIDRPeriod: 30
+    rpiCameraFPS: 5
+    rpiCameraBitrate: 600000
+    rpiCameraIDRPeriod: 5
     rpiCameraProfile: high
     rpiCameraLevel: '4.2'
     rpiCameraAfMode: continuous
     rpiCameraMetering: centre
     rpiCameraExposure: normal
     rpiCameraEV: 1
-    rpiCameraDenoise: cdn_hq
+    rpiCameraDenoise: cdn_fast
     rpiCameraBrightness: 0.08
   detect:
     source: rpiCamera
@@ -40,11 +41,13 @@ paths:
     rpiCameraCodec: auto
     rpiCameraWidth: 640
     rpiCameraHeight: 360
-    rpiCameraFPS: 8
-    rpiCameraBitrate: 400000
-    rpiCameraIDRPeriod: 24
+    # 4 fps: the brain samples /detect at 4 fps — anything faster is pure
+    # MJPEG-encode heat on the thermally-limited Zero 2 W.
+    rpiCameraFPS: 4
+    rpiCameraBitrate: 250000
+    rpiCameraIDRPeriod: 4
     rpiCameraMetering: centre
     rpiCameraExposure: normal
     rpiCameraEV: 1
-    rpiCameraDenoise: cdn_hq
+    rpiCameraDenoise: cdn_fast
     rpiCameraBrightness: 0.08

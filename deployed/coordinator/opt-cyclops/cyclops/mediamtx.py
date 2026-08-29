@@ -48,6 +48,16 @@ class CentralMTX:
         else:
             r.raise_for_status()
 
+    def source_of(self, name: str) -> str:
+        """The configured upstream RTSP URL currently used by cam_<name>."""
+        try:
+            r = requests.get(f"{self.base}/config/paths/get/cam_{name}", timeout=3)
+            if r.status_code != 200:
+                return ""
+            return (r.json() or {}).get("source") or ""
+        except (requests.RequestException, ValueError):
+            return ""
+
     def path_state(self, name: str) -> tuple[bool, int]:
         """(ready, bytes_received) for cam_<name> from the runtime API.
         ready=True means MediaMTX has the source connected and publishing."""

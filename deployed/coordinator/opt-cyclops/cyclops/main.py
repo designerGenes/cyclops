@@ -83,8 +83,82 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[startup] mediamtx proxy for {node.name} failed: {e}", flush=True)
     pool.sync()
+    threading.Thread(target=_lan_fallback_loop, daemon=True,
+                     name="lan-fallback").start()
+    threading.Thread(target=_thermal_alert_loop, daemon=True,
+                     name="thermal-alert").start()
     print("[startup] all proxy paths ready, accepting connections", flush=True)
     yield
+
+
+# --- LAN-direct pull with tailnet fallback -------------------------------
+# Proxies prefer the node's LAN address (no WireGuard crypto per frame on
+# the thermally-limited eye). If the LAN route breaks, fall back to the
+# tailnet route after 3 consecutive failed readiness checks (90 s); while on
+# the tailnet route, retry the LAN route at most every 10 minutes.
+_LAN_FAILS_BEFORE_FALLBACK = 3
+_LAN_RETRY_S = 600.0
+_lan_state: dict[str, dict] = {}      # name -> {fails, next_lan_retry}
+
+
+def _lan_fallback_loop():
+    while True:
+        for node in registry.all():
+            try:
+                ready, _ = mtx.path_state(node.name)
+                st = _lan_state.setdefault(
+                    node.name, {"fails": 0, "next_lan_retry": 0.0})
+                if ready:
+                    st["fails"] = 0
+                    continue
+                st["fails"] += 1
+                if st["fails"] < _LAN_FAILS_BEFORE_FALLBACK:
+                    continue
+                source = mtx.source_of(node.name)
+                on_lan = bool(node.lan_host) and source == node.primary_rtsp
+                if on_lan:
+                    print(f"[lan-fallback] {node.name}: LAN route "
+                          f"{node.primary_rtsp} not ready — switching to tailnet",
+                          flush=True)
+                    mtx.ensure_proxy(node.name, node.tailnet_primary_rtsp)
+                    with _health_lock:
+                        _health.pop(node.name, None)
+                elif node.lan_host and source == node.tailnet_primary_rtsp:
+                    if time.time() >= st["next_lan_retry"]:
+                        st["next_lan_retry"] = time.time() + _LAN_RETRY_S
+                        print(f"[lan-fallback] {node.name}: retrying LAN route "
+                              f"{node.primary_rtsp}", flush=True)
+                        mtx.ensure_proxy(node.name, node.primary_rtsp)
+                        with _health_lock:
+                            _health.pop(node.name, None)
+            except Exception as e:
+                print(f"[lan-fallback] {node.name}: {e}", flush=True)
+        time.sleep(30)
+
+
+# --- thermal watchdog ------------------------------------------------------
+# Alert when a node has been at critical tier for 10+ minutes straight, so
+# heat gets noticed before it becomes a red stream. Uses the same Twilio
+# channel (and cooldowns) as person alerts.
+_HOT_SUSTAINED_S = 600.0
+_hot_since: dict[str, float] = {}
+
+
+def _thermal_alert_loop():
+    while True:
+        now = time.time()
+        for n in registry.all():
+            try:
+                if n.tier == "critical":
+                    since = _hot_since.setdefault(n.name, now)
+                    if now - since >= _HOT_SUSTAINED_S:
+                        pool.alerts.thermal_alert(n)
+                        _hot_since[n.name] = now   # rely on alert cooldown too
+                else:
+                    _hot_since.pop(n.name, None)
+            except Exception as e:
+                print(f"[thermal-alert] {n.name}: {e}", flush=True)
+        time.sleep(60)
 
 
 app = FastAPI(title="Cyclops", lifespan=lifespan)
@@ -94,6 +168,7 @@ class RegisterBody(BaseModel):
     name: str
     token: str
     host: str
+    lan_host: str = ""
     rtsp_port: int = 8554
     streams: dict[str, str] | None = None
 
@@ -105,6 +180,7 @@ class HeartbeatBody(BaseModel):
     throttled: str = "0x0"
     tier: str = "full"
     uptime_s: int = 0
+    lan_host: str = ""
 
 
 class LayoutBody(BaseModel):
@@ -129,7 +205,8 @@ def _check_token(token: str) -> None:
 def register(body: RegisterBody, request: Request):
     _check_token(body.token)
     host = body.host or (request.client.host if request.client else "")
-    node = registry.upsert(body.name, host, body.rtsp_port, body.streams)
+    node = registry.upsert(body.name, host, body.rtsp_port, body.streams,
+                           lan_host=body.lan_host)
     try:
         mtx.ensure_proxy(node.name, node.primary_rtsp)
     except Exception as e:
@@ -141,10 +218,26 @@ def register(body: RegisterBody, request: Request):
 @app.post("/api/nodes/heartbeat")
 def heartbeat(body: HeartbeatBody):
     _check_token(body.token)
+    # Snapshot BEFORE registry.heartbeat mutates the shared Node object.
+    prev_lan = next((n.lan_host for n in registry.all()
+                     if n.name == body.name), "")
     node = registry.heartbeat(body.name, body.temp_c, body.throttled,
-                              body.tier, body.uptime_s)
+                              body.tier, body.uptime_s,
+                              lan_host=body.lan_host)
     if node is None:
         raise HTTPException(404, "unknown node; re-register")
+    # First time we learn the node's LAN address (or it changed): move both
+    # the central proxy and the detect watcher onto the cheaper LAN route.
+    if body.lan_host and body.lan_host != prev_lan:
+        try:
+            mtx.ensure_proxy(node.name, node.primary_rtsp)
+            with _health_lock:
+                _health.pop(node.name, None)
+            pool.restart_watcher(node.name)
+            print(f"[heartbeat] {node.name}: switched to LAN route "
+                  f"{node.primary_rtsp}", flush=True)
+        except Exception as e:
+            print(f"[heartbeat] {node.name}: LAN switch failed: {e}", flush=True)
     return {"ok": True}
 
 

@@ -12,11 +12,29 @@ ALERT_DIR = os.path.join(DATA_DIR, "alerts")
 
 
 class AlertManager:
+    THERMAL_COOLDOWN_S = 1800.0      # max one heat SMS per node per 30 min
+
     def __init__(self, cfg: Cfg) -> None:
         self.cfg = cfg
         self._last_alert: dict[str, float] = {}
         self._lock = threading.Lock()
         os.makedirs(ALERT_DIR, exist_ok=True)
+
+    def thermal_alert(self, node) -> bool:
+        """A node has been running at critical tier for a sustained period —
+        surface it through the same SMS channel as person alerts."""
+        now = time.time()
+        key = f"thermal:{node.name}"
+        with self._lock:
+            if now - self._last_alert.get(key, 0) < self.THERMAL_COOLDOWN_S:
+                return False
+            self._last_alert[key] = now
+        body = (f"CYCLOPS: {node.name} running hot — {node.temp_c:.1f}C, "
+                f"tier critical, throttled={node.throttled}. "
+                f"Check cooling/enclosure.")
+        threading.Thread(target=self._send_sms, args=(body, ""), daemon=True).start()
+        print(f"[alert-thermal] {body}", flush=True)
+        return True
 
     def maybe_alert(self, node_name: str, frame, boxes, detector_name: str) -> bool:
         now = time.time()
@@ -52,7 +70,7 @@ class AlertManager:
         data = {"To": t.to_number, "From": t.from_number, "Body": body}
         # MMS only works if Twilio's servers can fetch the media — that
         # requires a PUBLIC https url, not a tailnet one.
-        if t.public_media_base:
+        if t.public_media_base and fname:
             data["MediaUrl"] = f"{t.public_media_base.rstrip('/')}/alerts/{fname}"
         try:
             r = requests.post(

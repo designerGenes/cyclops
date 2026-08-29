@@ -16,6 +16,7 @@ class Node:
     rtsp_port: int = 8554
     primary_path: str = "cam"
     detect_path: str = "detect"
+    lan_host: str = ""            # LAN IPv4 reported by the node, "" = none
     registered_at: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
     temp_c: float = 0.0
@@ -23,13 +24,23 @@ class Node:
     tier: str = "full"
     uptime_s: int = 0
 
+    # RTSP endpoints prefer the LAN route (no per-packet WireGuard crypto
+    # on the thermally-limited eye); the tailnet route is the fallback.
+    @property
+    def rtsp_host(self) -> str:
+        return self.lan_host or self.host
+
     @property
     def primary_rtsp(self) -> str:
-        return f"rtsp://{self.host}:{self.rtsp_port}/{self.primary_path}"
+        return f"rtsp://{self.rtsp_host}:{self.rtsp_port}/{self.primary_path}"
 
     @property
     def detect_rtsp(self) -> str:
-        return f"rtsp://{self.host}:{self.rtsp_port}/{self.detect_path}"
+        return f"rtsp://{self.rtsp_host}:{self.rtsp_port}/{self.detect_path}"
+
+    @property
+    def tailnet_primary_rtsp(self) -> str:
+        return f"rtsp://{self.host}:{self.rtsp_port}/{self.primary_path}"
 
 
 class Registry:
@@ -60,12 +71,14 @@ class Registry:
         os.replace(tmp, self.path)
 
     def upsert(self, name: str, host: str, rtsp_port: int,
-               streams: dict | None = None) -> Node:
+               streams: dict | None = None, lan_host: str = "") -> Node:
         if not SAFE_NAME.match(name):
             raise ValueError("node name must match [a-zA-Z0-9_-]{1,40}")
         with self.lock:
             n = self.nodes.get(name) or Node(name=name, host=host)
             n.host, n.rtsp_port = host, rtsp_port
+            if lan_host:
+                n.lan_host = lan_host
             if streams:
                 n.primary_path = streams.get("primary", n.primary_path)
                 n.detect_path = streams.get("detect", n.detect_path)
@@ -75,13 +88,17 @@ class Registry:
             return n
 
     def heartbeat(self, name: str, temp_c: float, throttled: str,
-                  tier: str, uptime_s: int) -> Node | None:
+                  tier: str, uptime_s: int,
+                  lan_host: str = "") -> Node | None:
         with self.lock:
             n = self.nodes.get(name)
             if not n:
                 return None
             n.last_seen = time.time()
             n.temp_c, n.throttled, n.tier, n.uptime_s = temp_c, throttled, tier, uptime_s
+            if lan_host and lan_host != n.lan_host:
+                n.lan_host = lan_host
+                self._save()      # persist the LAN route across restarts
             return n
 
     def all(self) -> list[Node]:

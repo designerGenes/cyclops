@@ -5,6 +5,10 @@ import urllib.request
 
 BASE = "http://127.0.0.1:9997/v3"
 
+# The brain samples the detect stream at 4 fps — anything above that is
+# pure MJPEG-encode heat on the eye for frames nobody looks at.
+DETECT_FPS_CAP = 4
+
 
 def _req(method: str, url: str, payload: dict | None = None) -> dict | None:
     data = json.dumps(payload).encode() if payload is not None else None
@@ -38,9 +42,10 @@ def tier_cam_fields(tier: dict) -> dict:
 
 
 def tier_detect_fields(tier: dict) -> dict:
+    fps = min(tier["fps"], DETECT_FPS_CAP)
     return {
-        "rpiCameraFPS": tier["fps"],
-        "rpiCameraIDRPeriod": max(1, tier["fps"]),
+        "rpiCameraFPS": fps,
+        "rpiCameraIDRPeriod": max(1, fps),
     }
 
 
