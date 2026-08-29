@@ -1,0 +1,15 @@
+[Unit]
+Description=MediaMTX (camera streams)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/opt/mediamtx/mediamtx /opt/mediamtx/mediamtx.yml
+WorkingDirectory=/opt/mediamtx
+Restart=always
+RestartSec=2
+# the encoder runs hot; never let the OOM killer pick us first
+OOMScoreAdjust=-500
+
+[Install]
+WantedBy=multi-user.target

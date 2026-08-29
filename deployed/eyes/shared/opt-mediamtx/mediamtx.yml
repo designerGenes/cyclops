@@ -1,0 +1,50 @@
+# MediaMTX on the camera node. Two hardware-encoded H.264 streams from
+# one IMX708: /cam for humans, /detect for the NPU. TCP-only RTSP —
+# UDP on WiFi corrupts H.264.
+logLevel: info
+api: yes
+apiAddress: 127.0.0.1:9997
+
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp]
+
+# every other server off: this box has one job
+rtmp: no
+hls: no
+webrtc: no
+srt: no
+playback: no
+metrics: no
+
+paths:
+  cam:
+    source: rpiCamera
+    rpiCameraCodec: hardwareH264
+    rpiCameraWidth: 1280
+    rpiCameraHeight: 720
+    rpiCameraFPS: 5
+    rpiCameraBitrate: 600000
+    rpiCameraIDRPeriod: 5     # ~1s GOP: fast WHEP join/recovery + low-latency HLS
+    rpiCameraProfile: high
+    rpiCameraLevel: '4.2'
+    rpiCameraAfMode: continuous
+    rpiCameraMetering: centre
+    rpiCameraExposure: normal
+    rpiCameraEV: 1
+    rpiCameraDenoise: cdn_hq
+    rpiCameraBrightness: 0.08
+  detect:
+    source: rpiCamera
+    rpiCameraSecondary: true
+    rpiCameraCodec: auto
+    rpiCameraWidth: 640
+    rpiCameraHeight: 360
+    rpiCameraFPS: 5
+    rpiCameraBitrate: 250000
+    rpiCameraIDRPeriod: 10
+    rpiCameraMetering: centre
+    rpiCameraExposure: normal
+    rpiCameraEV: 1
+    rpiCameraDenoise: cdn_hq
+    rpiCameraBrightness: 0.08

@@ -1,0 +1,15 @@
+[Unit]
+Description=Cyclops brain (API + /stream UI + person detection)
+After=network-online.target mediamtx-central.service
+Wants=network-online.target mediamtx-central.service
+
+[Service]
+WorkingDirectory=/opt/cyclops
+Environment=CYCLOPS_CONFIG=/opt/cyclops/config.toml
+Environment=CYCLOPS_DATA=/opt/cyclops/data
+ExecStart=/opt/cyclops/venv/bin/uvicorn cyclops.main:app --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

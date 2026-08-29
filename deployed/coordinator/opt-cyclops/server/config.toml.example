@@ -1,0 +1,18 @@
+# /opt/cyclops/config.toml
+enroll_token = "CHANGE-ME"            # shared with every camnode
+public_base = "http://cyclops:8080"   # tailnet URL of this Pi 5 (for SMS links)
+
+[twilio]
+account_sid = ""
+auth_token = ""
+from_number = "+15550001111"
+to_number = "+15552223333"
+# Set ONLY if you expose /alerts on a public HTTPS host; enables true MMS.
+public_media_base = ""
+
+[detect]
+hef_path = "/opt/cyclops/models/yolov8s.hef"
+score_threshold = 0.45
+consecutive_hits = 2
+sample_fps = 4.0
+cooldown_s = 120.0

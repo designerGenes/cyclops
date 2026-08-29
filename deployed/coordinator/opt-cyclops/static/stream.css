@@ -1,0 +1,105 @@
+/* CYCLOPS stream wall — offline LAN console. No webfonts by design. */
+:root{
+  --bg:#0B0E12; --panel:#131820; --line:#222B36;
+  --txt:#C7D0DA; --dim:#76828F;
+  --iris:#E8A33D; --ok:#58B368; --bad:#E5484D; --seen:#3DA3E8;
+  --video-brightness:1.0; --video-contrast:1.0; --video-saturation:1.0;
+  --mono:ui-monospace,'SF Mono','Cascadia Mono','JetBrains Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--mono)}
+button,select{font-family:inherit}
+
+.bar{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;
+  align-items:center;gap:1rem;padding:.65rem 1rem;background:var(--bg);
+  border-bottom:1px solid var(--line)}
+.mark{display:flex;align-items:center;gap:.6rem}
+.mark h1{font-size:.95rem;letter-spacing:.45em;font-weight:600;margin:0}
+.sysline{font-size:.72rem;color:var(--dim);text-align:right}
+
+/* the iris — node health rendered as an eye */
+.iris{--c:var(--dim);width:.7rem;height:.7rem;border-radius:50%;
+  border:2px solid var(--c);background:radial-gradient(circle at 50% 50%,var(--c) 0 28%,transparent 30%);
+  display:inline-block;flex:none}
+.iris-lg{width:1.05rem;height:1.05rem}
+.iris.ok{--c:var(--ok)}
+.iris.idle{--c:var(--iris);animation:irispulse 1.2s ease-in-out infinite}
+.iris.error{--c:var(--bad);animation:irispulse 1.2s ease-in-out infinite}
+.iris.warm{--c:var(--iris)} .iris.hot{--c:var(--bad)}
+.iris.nosig{--c:#C457E8;animation:irispulse 1.2s ease-in-out infinite}
+@keyframes irispulse{0%,100%{opacity:1}50%{opacity:.35}}
+.tile.powerwarn .telemetry{color:var(--bad)}
+.iris.offline{--c:var(--dim);animation:blink 1.6s steps(2,start) infinite}
+@keyframes blink{to{opacity:.25}}
+.iris.disconnected{--c:var(--bad)}
+@media (prefers-reduced-motion:reduce){.iris.offline{animation:none;opacity:.5}.iris.nosig,.iris.idle,.iris.error{animation:none}}
+
+.stack{display:flex;flex-direction:column;gap:1rem;max-width:1100px;
+  margin:1rem auto;padding:0 1rem}
+
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  overflow:hidden;outline:none}
+.tile:focus-visible{border-color:var(--iris)}
+.tile.dragging{opacity:.45}
+.tile.dropline{border-top:2px solid var(--iris)}
+
+.tile-head{display:flex;align-items:center;gap:.55rem;padding:.45rem .7rem;
+  border-bottom:1px solid var(--line);font-size:.78rem}
+.drag{cursor:grab;color:var(--dim);user-select:none}
+.cam-name{font-weight:600;letter-spacing:.08em}
+.telemetry{margin-left:auto;color:var(--dim);font-size:.72rem;white-space:nowrap}
+
+/* person-detected latch. Lives in the header strip + a 3px line on the
+   top edge of the viewport — both deliberately NON-obscuring (never over
+   the picture). Driven by the .seen class on the tile; the API debounces
+   so this stays solid while a person is present and decays on its own. */
+.presence{display:none;align-items:center;font-size:.62rem;font-weight:600;
+  letter-spacing:.18em;color:var(--bg);background:var(--seen);
+  border-radius:999px;padding:.1rem .5rem;
+  animation:seenpulse 1.4s ease-out infinite}
+.tile.seen .presence{display:inline-flex}
+.tile.seen .viewport::after{content:"";position:absolute;left:0;right:0;top:0;
+  height:3px;background:var(--seen);z-index:2;pointer-events:none}
+@keyframes seenpulse{
+  0%{box-shadow:0 0 0 0 rgba(61,163,232,.55)}
+  100%{box-shadow:0 0 0 .5rem rgba(61,163,232,0)}}
+@media (prefers-reduced-motion:reduce){.presence{animation:none}}
+
+.viewport{position:relative;background:#000;aspect-ratio:16/9;overflow:hidden;
+  touch-action:none}
+.viewport canvas,.viewport video{width:100%;height:100%;display:block;
+  object-fit:contain;transform-origin:center center}
+.viewport canvas{display:none}
+.viewport video{position:relative;z-index:1}
+.viewport.zoomed{cursor:grab}
+.viewport.panning{cursor:grabbing}
+.veil{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;background:rgba(11,14,18,.82)}
+.veil-msg{font-size:.78rem;color:var(--dim);letter-spacing:.15em}
+
+.tile-ctl{display:flex;align-items:center;gap:.45rem;padding:.45rem .7rem;
+  font-size:.72rem;flex-wrap:wrap}
+.tile-ctl button{background:none;border:1px solid var(--line);color:var(--txt);
+  border-radius:4px;padding:.2rem .55rem;cursor:pointer;font-size:.72rem}
+.tile-ctl button:hover{border-color:var(--iris)}
+.tile-ctl button:focus-visible{outline:2px solid var(--iris);outline-offset:1px}
+.zoomval{color:var(--dim);min-width:3.2ch;text-align:center}
+.b-connect{color:var(--ok)}
+.b-connect.off{color:var(--bad)}
+.b-stream{color:var(--seen)}
+.b-stream.off{color:var(--dim)}
+.tiersel{margin-left:auto;color:var(--dim);display:flex;gap:.35rem;align-items:center}
+.tiersel select{background:var(--bg);color:var(--txt);border:1px solid var(--line);
+  border-radius:4px;padding:.15rem .3rem}
+
+.tray{max-width:1100px;margin:0 auto 2rem;padding:0 1rem}
+.tray h2{font-size:.72rem;color:var(--dim);letter-spacing:.3em;font-weight:400}
+.tray button{background:none;border:1px dashed var(--line);color:var(--dim);
+  border-radius:4px;padding:.3rem .7rem;margin:0 .4rem .4rem 0;cursor:pointer;
+  font-size:.74rem}
+.tray button:hover{color:var(--txt);border-color:var(--iris)}
+
+@media (max-width:640px){
+  .mark h1{letter-spacing:.3em}
+  .telemetry{display:none}
+}

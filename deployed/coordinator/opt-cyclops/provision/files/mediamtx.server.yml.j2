@@ -1,0 +1,29 @@
+# Central MediaMTX on the Pi 5. Paths are added at runtime by Cyclops
+# (one proxy per registered eye); browsers play them via WebRTC/WHEP
+# on :8889. HLS on :8888 is kept as a fallback player.
+logLevel: info
+api: yes
+apiAddress: 127.0.0.1:9997
+
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp]
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcHandshakeTimeout: 5s
+webrtcTrackGatherTimeout: 1s
+webrtcSTUNGatherTimeout: 3s
+
+hls: yes
+hlsAddress: :8888
+hlsVariant: fmp4
+hlsSegmentDuration: 500ms
+hlsPartDuration: 100ms
+hlsSegmentCount: 3
+
+rtmp: no
+srt: no
+playback: no
+
+paths: {}

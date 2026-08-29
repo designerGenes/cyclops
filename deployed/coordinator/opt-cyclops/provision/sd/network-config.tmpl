@@ -1,0 +1,11 @@
+network:
+  version: 2
+  wifis:
+    renderer: NetworkManager
+    wlan0:
+      dhcp4: true
+      regulatory-domain: "__WIFI_COUNTRY__"
+      access-points:
+        "__WIFI_SSID__":
+          password: "__WIFI_PASSWORD__"
+      optional: true

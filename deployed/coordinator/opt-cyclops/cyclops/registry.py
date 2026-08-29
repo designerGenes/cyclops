@@ -1,0 +1,106 @@
+from __future__ import annotations
+import json
+import os
+import re
+import threading
+import time
+from dataclasses import asdict, dataclass, field
+
+SAFE_NAME = re.compile(r"^[a-zA-Z0-9_-]{1,40}$")
+
+
+@dataclass
+class Node:
+    name: str
+    host: str
+    rtsp_port: int = 8554
+    primary_path: str = "cam"
+    detect_path: str = "detect"
+    registered_at: float = field(default_factory=time.time)
+    last_seen: float = field(default_factory=time.time)
+    temp_c: float = 0.0
+    throttled: str = "0x0"
+    tier: str = "full"
+    uptime_s: int = 0
+
+    @property
+    def primary_rtsp(self) -> str:
+        return f"rtsp://{self.host}:{self.rtsp_port}/{self.primary_path}"
+
+    @property
+    def detect_rtsp(self) -> str:
+        return f"rtsp://{self.host}:{self.rtsp_port}/{self.detect_path}"
+
+
+class Registry:
+    """Thread-safe node registry, persisted to JSON so a Cyclops restart
+    keeps every known eye."""
+
+    def __init__(self, data_dir: str) -> None:
+        self.path = os.path.join(data_dir, "registry.json")
+        self.layout_path = os.path.join(data_dir, "layout.json")
+        self.lock = threading.RLock()
+        self.nodes: dict[str, Node] = {}
+        self._load()
+
+    def _load(self) -> None:
+        try:
+            with open(self.path) as f:
+                for item in json.load(f):
+                    n = Node(**item)
+                    self.nodes[n.name] = n
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    def _save(self) -> None:
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        tmp = self.path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump([asdict(n) for n in self.nodes.values()], f, indent=2)
+        os.replace(tmp, self.path)
+
+    def upsert(self, name: str, host: str, rtsp_port: int,
+               streams: dict | None = None) -> Node:
+        if not SAFE_NAME.match(name):
+            raise ValueError("node name must match [a-zA-Z0-9_-]{1,40}")
+        with self.lock:
+            n = self.nodes.get(name) or Node(name=name, host=host)
+            n.host, n.rtsp_port = host, rtsp_port
+            if streams:
+                n.primary_path = streams.get("primary", n.primary_path)
+                n.detect_path = streams.get("detect", n.detect_path)
+            n.last_seen = time.time()
+            self.nodes[name] = n
+            self._save()
+            return n
+
+    def heartbeat(self, name: str, temp_c: float, throttled: str,
+                  tier: str, uptime_s: int) -> Node | None:
+        with self.lock:
+            n = self.nodes.get(name)
+            if not n:
+                return None
+            n.last_seen = time.time()
+            n.temp_c, n.throttled, n.tier, n.uptime_s = temp_c, throttled, tier, uptime_s
+            return n
+
+    def all(self) -> list[Node]:
+        with self.lock:
+            return list(self.nodes.values())
+
+    # ---- UI layout (tile order / hidden), persisted server-side so
+    # every browser sees the same stack ----
+    def get_layout(self) -> dict:
+        try:
+            with open(self.layout_path) as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return {"order": [], "hidden": []}
+
+    def set_layout(self, layout: dict) -> None:
+        os.makedirs(os.path.dirname(self.layout_path), exist_ok=True)
+        with open(self.layout_path, "w") as f:
+            json.dump({
+                "order": [str(x) for x in layout.get("order", [])],
+                "hidden": [str(x) for x in layout.get("hidden", [])],
+            }, f, indent=2)

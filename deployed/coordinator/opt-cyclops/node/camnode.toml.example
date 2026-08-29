@@ -1,0 +1,6 @@
+# /opt/camnode/camnode.toml — written by provisioning, edit if needed.
+name = "front-door"                       # unique camera name (tile label)
+cyclops_url = "http://cyclops:8080"       # Pi 5 tailnet name or IP
+enroll_token = "CHANGE-ME"                # must match server config.toml
+advertise_host = ""                       # tailnet hostname/IP this node is reachable at
+reboot_after_unreachable_s = 600

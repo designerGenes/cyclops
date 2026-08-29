@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CYCLOPS — stream wall</title>
+<link rel="stylesheet" href="/static/stream.css?v=4">
+</head>
+<body>
+<header class="bar">
+  <div class="mark">
+    <span class="iris iris-lg" id="sysIris" aria-hidden="true"></span>
+    <h1>CYCLOPS</h1>
+  </div>
+  <div class="sysline" id="sysline">connecting…</div>
+</header>
+
+<main id="stack" class="stack" aria-label="camera stack"></main>
+
+<section class="tray" id="tray" hidden>
+  <h2>hidden</h2>
+  <div id="trayItems"></div>
+</section>
+
+<template id="tileTpl">
+  <article class="tile" tabindex="0">
+    <div class="tile-head">
+      <span class="drag" draggable="true" title="drag to reorder">⠿</span>
+      <span class="iris" aria-hidden="true"></span>
+      <span class="cam-name"></span>
+      <span class="presence" role="status" aria-label="person detected">PERSON</span>
+      <span class="telemetry"></span>
+    </div>
+    <div class="viewport">
+      <canvas aria-hidden="true"></canvas>
+      <video autoplay muted playsinline></video>
+      <div class="veil" hidden><span class="veil-msg"></span></div>
+    </div>
+    <div class="tile-ctl">
+      <button class="b-pause" title="pause/resume stream">pause</button>
+      <button class="b-zoom-out" title="zoom out">−</button>
+      <span class="zoomval">1.0×</span>
+      <button class="b-zoom-in" title="zoom in">+</button>
+      <button class="b-fit" title="reset zoom">fit</button>
+      <label class="tiersel">tier
+        <select>
+          <option value="auto">auto</option>
+          <option value="full">full</option>
+          <option value="warm">warm</option>
+          <option value="hot">hot</option>
+          <option value="critical">critical</option>
+        </select>
+      </label>
+      <label class="fpssel">fps
+        <select>
+          <option value="auto">auto</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+          <option value="12">12</option>
+        </select>
+      </label>
+      <button class="b-hide" title="hide this camera">hide</button>
+    </div>
+  </article>
+</template>
+
+<script src="/static/stream.js?v=4"></script>
+</body>
+</html>

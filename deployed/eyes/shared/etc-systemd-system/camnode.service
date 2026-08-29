@@ -1,0 +1,18 @@
+[Unit]
+Description=camnode agent (thermal governor + Cyclops registration)
+After=network-online.target mediamtx.service
+Wants=network-online.target mediamtx.service
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStart=/usr/bin/python3 -m camnode.agent
+Environment=PYTHONPATH=/opt/camnode
+Environment=CAMNODE_CONFIG=/opt/camnode/camnode.toml
+WatchdogSec=30
+Restart=always
+RestartSec=2
+OOMScoreAdjust=-500
+
+[Install]
+WantedBy=multi-user.target
