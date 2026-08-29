@@ -14,3 +14,4 @@ test-results/
 *.sqlite3
 apps/coordinator-api/src/cyclops_coordinator/static/assets/
 apps/coordinator-api/src/cyclops_coordinator/static/index.html
+.soupignore

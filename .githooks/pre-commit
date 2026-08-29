@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-commit hook: block commits that introduce secrets.
+# Scans STAGED changes only, so history and unrelated files don't block you.
+# Installed via: git config core.hooksPath .githooks
+# Bypass (only for known false positives): git commit --no-verify
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "pre-commit: gitleaks not found — skipping secret scan."
+    echo "pre-commit: install it with: brew install gitleaks"
+    exit 0
+fi
+
+exec gitleaks protect --staged --redact -v
