@@ -98,7 +98,7 @@ class Agent:
             "token": c["enroll_token"],
             "temp_c": thermal.read_temp_c(),
             "throttled": hex(thermal.read_throttled()),
-            "tier": thermal.TIERS[self.gov.idx]["name"],
+            "tier": self.gov.effective_tier()["name"],
             "uptime_s": int(time.monotonic() - START),
         }
         try:
@@ -232,7 +232,7 @@ class Agent:
                         "name": agent.cfg["name"],
                         "temp_c": thermal.read_temp_c(),
                         "throttled": hex(thermal.read_throttled()),
-                        "tier": thermal.TIERS[agent.gov.idx]["name"],
+                        "tier": agent.gov.effective_tier()["name"],
                         "fps": agent.gov.effective_tier()["fps"],
                         "override": agent.gov.override,
                         "mediamtx": mediamtx_api.healthy(),

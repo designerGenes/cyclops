@@ -5,6 +5,14 @@ throttle flags, then decides which stream tier the camera should run.
 Tier transitions step DOWN immediately and step UP only after the
 node has been comfortably cool for a dwell period (hysteresis), so the
 stream never oscillates.
+
+Manual overrides (tier / fps, set from the Cyclops UI) are treated as a
+CEILING the user wants, never as permission to exceed the thermal
+budget: an override can only make the camera run cooler than the
+thermal policy requires — it can never pin a hot node into a heavier
+tier. Similarly, an fps boost is only honored while the node is
+running cool (full/warm tier) and is suspended automatically the
+moment the thermal tier reaches hot or critical.
 """
 from __future__ import annotations
 import subprocess
@@ -28,6 +36,11 @@ TIERS = [
 ]
 EXIT_MARGIN_C = 4.0     # must be this far below a tier's enter temp...
 UP_DWELL_S = 120.0      # ...for this long, before stepping back up
+
+# A manual fps boost is only honored while the effective tier is at or
+# above (cooler than) this index. At hot/critical the boost suspends and
+# the tier's own fps applies, so a UI fps override can never cook the node.
+FPS_BOOST_MAX_TIER_IDX = 1   # full(0), warm(1)
 
 
 def read_temp_c() -> float:
@@ -56,9 +69,21 @@ class Governor:
         self.fps_override: int | None = None
         self._cool_since: float | None = None
 
+    def effective_idx(self) -> int:
+        """The tier the camera should run right now: the thermal
+        requirement, optionally made COOLER by a manual override. An
+        override can never make the node run hotter than the thermal
+        policy allows — pinning a hot node at a light tier is exactly
+        the overheating loop this prevents."""
+        idx = self.idx
+        if self.override is not None and self.override > idx:
+            idx = self.override
+        return idx
+
     def effective_tier(self) -> dict:
-        tier = dict(TIERS[self.idx])
-        if self.fps_override is not None:
+        idx = self.effective_idx()
+        tier = dict(TIERS[idx])
+        if self.fps_override is not None and idx <= FPS_BOOST_MAX_TIER_IDX:
             tier["fps"] = self.fps_override
         return tier
 
@@ -74,12 +99,11 @@ class Governor:
         return idx
 
     def step(self, temp: float, throttled: int) -> int | None:
-        """Returns a new tier index if a change is needed, else None."""
-        if self.override is not None:
-            if self.idx != self.override:
-                self.idx = self.override
-                return self.idx
-            return None
+        """Returns a new thermal tier index if a change is needed, else None.
+
+        Thermal logic ALWAYS runs — even under a manual override. The
+        override only shifts the effective tier via effective_idx(); it can
+        never suppress a safety demotion."""
         need = self.required_idx(temp, throttled)
         if need > self.idx:                       # hotter: drop NOW
             self.idx = need
