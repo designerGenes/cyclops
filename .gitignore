@@ -12,6 +12,7 @@ test-results/
 *.tsbuildinfo
 *.db
 *.sqlite3
+*.blend1
 apps/coordinator-api/src/cyclops_coordinator/static/assets/
 apps/coordinator-api/src/cyclops_coordinator/static/index.html
 .soupignore
