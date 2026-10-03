@@ -1,0 +1,15 @@
+# Copy to /etc/cyclops-eye.conf only during a later, approved rollout.
+# Values deliberately use key=value rather than TOML so the daemon has no parser dependency.
+node_name=luckfox-eye-01
+enroll_token=REPLACE_WITH_A_UNIQUE_ENROLLMENT_TOKEN
+cyclops_url=http://cyclops.local:8080
+
+# Empty selects the first non-loopback/non-Tailscale IPv4 address at startup.
+advertise_host=
+camera_id=0
+iq_dir=/etc/iqfiles
+rtsp_port=8554
+control_port=8800
+heartbeat_seconds=15
+thermal_poll_seconds=5
+reboot_after_unreachable_seconds=600

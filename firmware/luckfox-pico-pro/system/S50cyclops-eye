@@ -1,0 +1,29 @@
+#!/bin/sh
+# Buildroot/SysV init service for the LuckFox Pico Pro. This file is staged only;
+# it is not installed or enabled by this repository.
+
+DAEMON=/usr/bin/cyclops-eye
+CONFIG=/etc/cyclops-eye.conf
+PIDFILE=/var/run/cyclops-eye.pid
+
+case "$1" in
+  start)
+    [ -x "$DAEMON" ] && [ -r "$CONFIG" ] || exit 1
+    printf '%s\n' "Starting Cyclops LuckFox Eye"
+    "$DAEMON" "$CONFIG" >>/var/log/cyclops-eye.log 2>&1 &
+    echo $! >"$PIDFILE"
+    ;;
+  stop)
+    [ -r "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null || true
+    rm -f "$PIDFILE"
+    ;;
+  restart)
+    "$0" stop
+    sleep 1
+    "$0" start
+    ;;
+  *)
+    echo "usage: $0 {start|stop|restart}" >&2
+    exit 64
+    ;;
+esac
