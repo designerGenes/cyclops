@@ -4,9 +4,11 @@ For every part this verifies a watertight 2-manifold (no non-manifold edges,
 no degenerate faces), reports bounding box and volume, and then probes a few
 specific features with ray cast so a silently-failed boolean gets caught:
 
-* ``cover``  — chimney aperture open over the SoC, RJ45 notch open at the rear
-* ``chimney``— exhaust slots open through the stack walls behind the skirt
-* ``base``   — intake slots open through the floor beneath the PCB plenum
+* ``cover``    — chimney aperture open over the SoC; RJ45 notch and the front
+                 barrel opening both open at their ends
+* ``chimney``  — exhaust slots open through the stack wall behind the skirt
+* ``base``     — intake slots open through the floor beneath the PCB plenum
+* ``nose``     — the lens/barrel tunnel is clear end to end
 """
 
 import sys
@@ -19,19 +21,11 @@ from mathutils import Vector
 STL_DIR = Path(sys.argv[sys.argv.index("--stl") + 1])
 
 INTENT = {
-    "base":    dict(x=(-40.0, 40.0), y=(-15.0, 15.0), z=(-4.0, 14.0)),
-    "cover":   dict(x=(-40.0, 40.0), y=(-15.0, 15.0), z=(12.0, 25.0)),
-    "chimney": dict(x=(-14.0, 22.0), y=(-17.0, 17.0), z=(23.0, 48.0)),
-    "nose":    dict(x=(37.0, 62.0), y=(-16.0, 16.0), z=(-3.0, 28.0)),
-    "gasket":  dict(x=(-40.0, 40.0), y=(-14.0, 14.0), z=(11.0, 15.0)),
-}
-
-# Solid-block reference volumes (mm^3) to confirm void features were removed.
-SOLID_VOLUME = {
-    "base":    77.2 * 26.2 * 13.0,
-    "cover":   77.2 * 26.2 * 10.9,
-    "chimney": 32.0 * 32.0 * 23.0,   # bounding solid around stack + cap
-    "nose":    12.0 * 29.4 * 28.4,
+    "base":    dict(x=(-55.0, 55.0), y=(-16.0, 16.0), z=(-4.0, 14.0)),
+    "cover":   dict(x=(-55.0, 55.0), y=(-16.0, 16.0), z=(12.0, 25.0)),
+    "chimney": dict(x=(-18.0, 26.0), y=(-21.0, 21.0), z=(23.0, 49.0)),
+    "nose":    dict(x=(52.0, 82.0), y=(-21.0, 21.0), z=(-10.0, 33.0)),
+    "gasket":  dict(x=(-54.0, 54.0), y=(-16.0, 16.0), z=(11.0, 15.0)),
 }
 
 failed = False
@@ -39,17 +33,15 @@ failed = False
 
 def report(ok: bool, part: str, msg: str) -> None:
     global failed
-    tag = "OK" if ok else "FAIL"
     if not ok:
         failed = True
-    print(f"[{tag}] {part}: {msg}")
+    print(f"[{'OK' if ok else 'FAIL'}] {part}: {msg}")
 
 
-def ray_hit(scene, depsgraph, origin, direction, distance=200.0):
-    result, loc, normal, index, obj, matrix = scene.ray_cast(
-        depsgraph, Vector(origin), Vector(direction), distance=distance
-    )
-    return (result, loc, obj)
+def ray_hit(scene, depsgraph, origin, direction, distance=260.0):
+    hit_ok, loc, normal, index, obj, matrix = scene.ray_cast(
+        depsgraph, Vector(origin), Vector(direction), distance=distance)
+    return (hit_ok, loc, obj)
 
 
 for part, intent in INTENT.items():
@@ -80,41 +72,44 @@ for part, intent in INTENT.items():
     report(not non_manifold, part, f"{len(non_manifold)} non-manifold edge(s)")
     report(not degenerate, part, f"{len(degenerate)} degenerate face(s)")
 
-    vol_info = ""
-    if part in SOLID_VOLUME:
-        vol_info = f", volume {volume:.0f} mm^3 (solid {SOLID_VOLUME[part]:.0f})"
+    for axis, (lo, hi) in intent.items():
+        idx = {"x": 0, "y": 1, "z": 2}[axis]
+        if bounds[idx] < lo - 1.0 or bounds[idx + 3] > hi + 1.0:
+            print(f"[WARN] {part}: {axis} bounds {bounds[idx]:.1f}..{bounds[idx + 3]:.1f} "
+                  f"outside intent {lo}..{hi}")
+            failed = True
+
     print(f"       {part}: {len(mesh.vertices)} verts / {len(mesh.polygons)} faces, "
           f"bounds x {bounds[0]:.1f}..{bounds[3]:.1f} y {bounds[1]:.1f}..{bounds[4]:.1f} "
-          f"z {bounds[2]:.1f}..{bounds[5]:.1f}{vol_info}")
+          f"z {bounds[2]:.1f}..{bounds[5]:.1f}, volume {volume:.0f} mm^3")
 
-    # ---- feature probes -------------------------------------------------
     scene = bpy.context.scene
     depsgraph = bpy.context.evaluated_depsgraph_get()
 
     if part == "cover":
-        # Chimney aperture: a ray down the stack centre must not hit the top
-        # wall and must fall straight through (hit <= rim or nothing).
-        hit, loc, _ = ray_hit(scene, depsgraph, (4.0, 0.0, 50.0), (0, 0, -1))
-        open_ = (not hit) or (loc[2] < 15.0)
-        report(open_, part, "chimney aperture open over SoC")
+        hit, loc, _ = ray_hit(scene, depsgraph, (4.0, 0.0, 80.0), (0, 0, -1))
+        report((not hit) or (loc[2] < 15.0), part, "chimney aperture open over SoC")
 
-        # RJ45 notch: from the rear, a ray at port height must clear the rear
-        # wall and strike the far (front) wall instead.
-        hit, loc, _ = ray_hit(scene, depsgraph, (-45.0, 0.0, 17.0), (1, 0, 0))
-        report(hit and loc[0] > 30.0, part, "RJ45 notch open at rear wall")
+        hit, loc, _ = ray_hit(scene, depsgraph, (-56.0, 0.0, 17.0), (1, 0, 0))
+        report((not hit) or (loc[0] > 40.0), part, "RJ45 notch open at rear")
+
+        hit, loc, _ = ray_hit(scene, depsgraph, (49.0, 0.0, 17.0), (1, 0, 0))
+        report((not hit) or (loc[0] < -40.0), part, "front barrel opening open")
 
     if part == "chimney":
-        # Exhaust slot: from just inside the skirt, a ray at slot height must
-        # pass through the stack wall and stop at the far inner wall (x < 0).
-        hit, loc, _ = ray_hit(scene, depsgraph, (17.5, 0.0, 35.0), (-1, 0, 0))
+        hit, loc, _ = ray_hit(scene, depsgraph, (19.0, 0.0, 35.0), (-1, 0, 0))
         report(hit and loc[0] < 0.0, part, "exhaust slots open through stack wall")
 
     if part == "base":
-        # Intake slot: straight down through (0,0) must pass the floor plate
-        # (centre slot) and either miss or land below the floor underside.
         hit, loc, _ = ray_hit(scene, depsgraph, (0.0, 0.0, 5.0), (0, 0, -1))
-        open_ = (not hit) or (loc[2] < 0.0)
-        report(open_, part, "intake slots open through floor")
+        report((not hit) or (loc[2] < 0.0), part, "intake slots open through floor")
+
+        hit, loc, _ = ray_hit(scene, depsgraph, (49.0, 0.0, 8.0), (1, 0, 0))
+        report((not hit) or (loc[0] < -40.0), part, "front barrel opening open")
+
+    if part == "nose":
+        hit, loc, _ = ray_hit(scene, depsgraph, (82.0, 0.0, 12.0), (-1, 0, 0))
+        report(not hit, part, "lens/barrel tunnel clear end to end")
 
 print("RESULT:", "FAIL" if failed else "PASS")
 sys.exit(1 if failed else 0)
