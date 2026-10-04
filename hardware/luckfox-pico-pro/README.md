@@ -1,78 +1,99 @@
-# LuckFox Pico Pro — Weatherproof Enclosure
+# LuckFox Pico Pro — Top-Hood Weather Camera
 
-A parametric, Blender-built enclosure for the **LuckFox Pico Pro (RV1106)** +
-**SC3336** camera, designed for outdoor security-camera duty. It is a sibling
-to `firmware/luckfox-pico-pro/` and does **not** alter any deployed board,
-firmware, or camera.
+A parametric Blender enclosure for the **LuckFox Pico Pro (RV1106)** and
+**SC3336** camera. This remains an isolated hardware-design project: it does
+not alter deployed Cyclops cameras or firmware.
 
-## Design goals
+## Design direction
 
-* **Symmetric & rounded (v2)** — the body is a *capsule* (stadium plan closed
-  by two full semicircular ends, 106 × 30 mm), the cooling stack is a **round
-  chimney** with a conical rain cap, and the camera is a **cylindrical lens
-  barrel** centred on the front dome. Long hard edges are softened with a
-  baked bevel so nothing reads as a square-cornered "plug".
-* **Minimalist** — a single split seam, no fans, no moving parts; every part
-  prints without supports.
-* **Passive heat venting** — the round chimney sits directly over the RV1106
-  SoC.  Cool air enters through downward-facing floor vents, rises through the
-  3.5 mm stand-off plenum under the PCB, over the components, and out the top.
-* **Weatherproof** — every opening is angled or shielded so gravity keeps
-  rain and driven spray out:
-  * intake vents open **straight down** through the floor (raised on feet),
-  * chimney exhaust slots sit **behind a skirt that drops below them**, forcing
-    the air path to turn downward before it reaches open air, under a pitched
-    roof,
-  * base/cover halves seal on a captured TPU gasket channel,
-  * RJ45 port and M12 lens both sit under protective hoods.
+This revision replaces the separate round chimney and projecting camera
+barrel with a broad, contained camera body. It borrows the *weather-shedding
+method* of a top-hooded outdoor camera—recessed optics, a broad raised canopy,
+and water paths that lead away from the window—without copying a specific
+product's dimensions or shell geometry.
 
-## Parts
+* **Broad, rounded housing:** 110 × 58 × 34 mm with rounded-rectangle corners.
+  The SC3336 board and all camera-facing hardware sit within the main body
+  envelope.
+* **Recessed optical panel:** a flush-looking 20 × 18 mm dark window sits
+  1.2 mm behind the front fascia; the M12 lens is behind the panel, not in an
+  external barrel. Two shallow channels flank the window to route water down
+  the front.
+* **Top canopy:** a separate 124 × 64 mm rounded canopy stands 8 mm above the
+  case on four supports. It overhangs the front face by 10 mm and has a slight
+  forward pitch. Its eaves protect the window and provide a sheltered ambient
+  air path over the thermal fins.
+* **Thermal path:** a gasketed aluminum insert passes through a 20 × 20 mm
+  roof port over the RV1106. A metal stem bridges the SoC heatsink to a
+  low-profile, six-fin heat-spreader under the canopy. The electronics cavity
+  remains sealed; outside airflow is around the insert, not through the
+  electronics.
+* **Service seam:** the base and cover compress a TPU perimeter gasket. A
+  second small TPU seal sits under the thermal insert flange.
 
-| Part | Purpose |
+This is a CAD concept, not a validated IP-rated enclosure. The actual optical
+window material/seal, RJ45 gland, canopy retention, thermal interface,
+condensation behavior, and operating temperatures still need to be verified
+on the selected hardware before outdoor deployment.
+
+## Assembly parts
+
+| Part | Material / purpose |
 | --- | --- |
-| `Base_Tub` | floor, PCB standoffs, down-facing intakes, drain weeps, RJ45 (lower), gasket channel, feet |
-| `Top_Cover` | upper shell, chimney aperture, RJ45 (upper), flat rim that compresses the gasket |
-| `Chimney_Stack` | round exhaust stack + conical rain cap + skirt |
-| `Camera_Nose` | Ø40 lens barrel, M12 port, Ø32 lens shade tube, Ø30 rear FFC opening |
-| `Gasket_Seal` | TPU cord captured in the base channel (2.4 mm deep) |
-| `*_Proxy` | non-exported reference solids (PCB, RJ45, heatsink, lens, sensor) |
+| `base` | PETG/ASA lower tub, PCB standoffs, lower optical recess, lower RJ45 opening, perimeter gasket groove |
+| `cover` | PETG/ASA upper shell, recessed front window pocket, thermal port, upper RJ45 opening, canopy sockets |
+| `hood` | PETG/ASA canopy plate and four supports; overhang shades the optics and shelters the fins |
+| `gasket` | TPU main shell seal |
+| `thermal_seal` | TPU seal under the heat-spreader flange |
+| `thermal_insert` | aluminum concept part: roof flange, bridge stem, and six low fins |
+| `Optical_Window` | non-exported smoked-polycarbonate/glass placeholder, recessed behind the fascia |
+| `Reference_Proxies` | PCB, RJ45, SC3336, M12 lens, and RV1106 heatsink fit references (viewport only) |
 
-## Key dimensions (mm)
+The *lens panel* and *thermal insert* are separate hardware items; only the
+shell, hood, and TPU seals are intended for plastic printing. The metal insert
+and canopy attachment need mechanical detailing before a production print.
 
-* body: 106.0 long × 30.0 wide, semicircular ends (r = 15), ~24 tall
-* interior: 26 wide, PCB on 3.5 mm standoffs, 21.9 mm headroom over the RJ45 cage
-* chimney: Ø24 stack over the SoC (Ø20 column clears the full 14 × 14 heatsink),
-  Ø40 rain cap, roof apex z ≈ 48
-* nose: Ø40 barrel × 20 long, lens at the body mid-height, Ø30 cable aperture
-* seam: base/cover split at z = 13 with a captured TPU gasket
+## Dimensions (nominal, mm)
 
-## Layout
+* Main body: **110 × 58 × 34**, rounded corners (R9).
+* Internal envelope: **106 × 54**; 2 mm walls and 3.5 mm PCB standoffs.
+* Window: **20 × 17**, with the M12 lens recessed behind it.
+* Canopy: **124 × 64**, 3 mm roof, 8 mm air gap, 10 mm front overhang.
+* Roof thermal port: **20 × 20**; **28 × 26** flange; six 3 mm fins with
+  approximately 3.9 mm clearance to the canopy underside.
+* Case seam: z = 9.5 mm, below the recessed optical panel; a 1.6 mm TPU bead
+  is captured in the base groove.
+
+All dimensions are nominal CAD values. Confirm the board, jack, camera module,
+FFC bend radius, thermal insert, and fastener sizes against the actual inbound
+board revision before manufacturing.
+
+## Project files
 
 ```
 hardware/luckfox-pico-pro/
-├── enclosure_geometry.py   # pure-Python parametric model (no Blender import)
-├── generate_case.py        # Blender driver: builds geometry, STLs, renders
-├── verify_stls.py          # headless STL manifold + feature probe checks
-├── generate.sh             # one-shot regenerate + verify
-├── tests/
-│   └── test_enclosure_geometry.py
-└── out/                    # generated artifacts (committed deliverables)
+├── enclosure_geometry.py     # Blender-independent parametric model
+├── generate_case.py          # Blender scene, STLs, and image previews
+├── verify_stls.py             # manifold + opening/clearance feature probes
+├── generate.sh                # regenerate and verify the deliverables
+├── tests/test_enclosure_geometry.py
+└── out/
     ├── luckfox_pico_pro_enclosure.blend
     ├── stl/luckfox_enclosure_*.stl
     └── preview/luckfox_enclosure_*.png
 ```
 
-## Open in Blender
+## Open and refine in Blender
 
 ```bash
 blender /Users/admin/DEV/01_active_projects/cyclops/hardware/luckfox-pico-pro/out/luckfox_pico_pro_enclosure.blend
 ```
 
-Two collections: `Luckfox_Enclosure` (the five printable parts) and
-`Reference_Proxies` (PCB / RJ45 / heatsink / lens / sensor for fit-checking).
-Dimensions are in millimetres (`scale_length = 0.001`).
+Collections are `Luckfox_Enclosure`, `Recessed_Optics`, and `Reference_Proxies`.
+Reference proxies are visible in the viewport but hidden from preview renders;
+toggle their collection to check internal fit. Units are millimetres.
 
-## Regenerate / verify
+## Regenerate and test
 
 ```bash
 cd /Users/admin/DEV/01_active_projects/cyclops
@@ -80,38 +101,35 @@ bash hardware/luckfox-pico-pro/generate.sh
 uv run pytest hardware/luckfox-pico-pro/tests
 ```
 
-`generate.sh` rebuilds the Blender project, exports the STLs, and re-runs
-`verify_stls.py`, which proof-checks every part for watertightness
-(0 non-manifold edges / 0 degenerate faces) and ray-casts the intakes, chimney
-aperture, RJ45 notch, barrel opening, and exhaust slots to confirm they are
-genuinely open.  The geometry tests assert the thermal/weather invariants
-(skirt-below-exhaust, downward intakes, full heatsink coverage) plus the
-rounding/symmetry parameters.
+`generate.sh` rebuilds the `.blend`, six part STLs, and iso/front/rear/top/side
+previews. The STL verifier checks every part for zero non-manifold edges and
+degenerate faces; it also ray-casts the optical window, thermal port, and RJ45
+openings to catch failed booleans.
 
-## Printing notes (for the future build-out)
+## Manufacturing / validation notes
 
-* **Material:** PETG or ASA (outdoor UV). The gasket prints in TPU.
-* **Orientation:** base tub prints flat (feet down); cover prints flat
-  (rim down); chimney prints roof-side down (tall hollow column, ≥ 4
-  perimeters, no supports); the nose prints lens-port down.
-* **Seam:** press the TPU cord into the base channel; the cover's flat rim
-  compresses it. Secure the two halves with M2.5 self-tapping screws into the
-  corner bosses at the straight section.
-* **Heatsink:** bond a 14 × 14 mm aluminium finned heatsink to the RV1106
-  package under the Ø20 chimney column.
-* **Intakes & weeps:** press 20-mesh stainless screen into the floor vents;
-  leave the two front weeps open as condensation drains.
-* **Ports:** fit an RJ45 weatherproof gland over the rear port and an M12
-  barrel O-ring at the lens; the Ø32 shade tube doubles as a sun/rain hood.
-* **Mounting posture:** intended wall/soffit mounted with the chimney up and
-  the lens barrel pointing out; the Ø40 barrel is deliberately prominent
-  (it must clear the 25 × 24 mm sensor module). The four feet support the
-  underside for any temporary benchtop placement.
+* Use PETG or ASA for the shell and hood; use TPU for both seals. The thermal
+  insert is modeled as aluminum, not as a printed plastic heatsink.
+* The canopy is shown as a separate piece with support posts seated in shallow
+  roof sockets. Add a positive retention feature (for example, sealed screws
+  or a gasketed clip) before using the model outdoors; it is not yet wind-load
+  tested.
+* Seat a sealed, UV-stable optical window into the front recess and confirm
+  that it does not vignette the SC3336 lens at the required field of view.
+* Validate the thermal insert's contact pressure, thermal pad thickness,
+  fin airflow, and sustained RV1106 temperature on a real board. The proxy
+  geometry is not CFD or thermal test data.
+* Check the actual cable gland and connector strain relief. The rear RJ45
+  notch is a nominal opening, not a finished gland interface.
+* The printed parts have been checked for mesh integrity, not for slicer
+  support strategy, screw strength, UV life, or a specific ingress-protection
+  rating.
 
-## Refinement TODOs
+## Follow-up refinements
 
-* wall-mount bracket (stand-off plate + screw bosses) — the rear face carries
-  the RJ45 port, so a plate is planned rather than ear holes,
-* countersunk fastener holes through the nose into the body bosses,
-* drip lip under the rain-cap eave, and a chamfer where the barrel meets the
-  front dome for a smoother blend.
+* secure the hood posts with a sealed retention detail and define fastener
+  dimensions,
+* add a proper window retainer / perimeter seal,
+* add the pole/wall mounting interface and RJ45 gland dimensions,
+* fit-check thermal bridge and FFC bend using the exact production board,
+* measure temperature and verify water ingress before deployment.

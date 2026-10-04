@@ -1,546 +1,541 @@
-"""Parametric geometry for the LuckFox Pico Pro weatherproof camera enclosure.
+"""Parametric geometry for the LuckFox Pico Pro top-hood camera enclosure.
 
-This module is deliberately free of any Blender dependency so that the
-enclosure's dimensional model can be unit-tested on the host.  Every value the
-Blender build script (``generate_case.py``) needs is computed here from a
-single set of inputs, keeping the 3D builder and the tests in lock-step.
+This module has no Blender dependency. It owns the dimensions and emits a
+primitive list consumed by ``generate_case.py``; the same model is exercised by
+the host unit tests.
 
-All lengths are in millimetres.  Conventions:
+Coordinates are millimetres: +X is the camera/front, -X is the RJ45/rear, +Z
+is up, and the board lies in the XY plane.
 
-* +X points toward the camera (front), -X toward the RJ45/PoE port (rear).
-* +Z points up.  ``z == 0`` is the underside of the floor plate.
-* The plan origin sits at the centre of the PCB footprint.
-
-Aesthetic intent (v2)
----------------------
-
-The first cut was a slim rectangular "plug".  This revision is optimised for
-**symmetry** and **rounded corners**:
-
-* the body plan is a *stadium* (capsule): a straight mid-section closed by two
-  full semicircular ends, so front and rear read identically and every corner
-  in plan is a smooth radius;
-* the cooling stack is a **round chimney** with a conical rain cap and a
-  cylindrical skirt (rotationally symmetric);
-* the camera is a **cylindrical lens barrel** centred on the front dome;
-* long hard edges are softened with a baked bevel at build time.
-
-Thermal / weather design is unchanged in principle and is what the tests
-enforce: cool air enters through downward-facing floor vents beneath the PCB
-plenum, rises over the components, and exits through chimney slots that sit
-behind a skirt that drops *below* the openings, so the air path turns downward
-again before it meets open air.
+The design takes a broad, sheltered-window approach rather than copying any
+specific camera housing: a wide rounded-rectangle body, a recessed flat optical
+window, a full-width raised canopy with a front drip brow, and a sealed thermal
+insert linking the RV1106 heatsink to a low-profile external fin pack beneath
+the canopy. The electronics enclosure stays sealed; ambient air can circulate
+around the external fins through the canopy's down-facing side gap.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
+
 
 Vec = Tuple[float, float, float]
 
 
 @dataclass(frozen=True)
 class BoardSpec:
-    """Physical dimensions of the LuckFox Pico Pro (RV1106) + RJ45 cage."""
-
     pcb_length: float = 72.0
     pcb_width: float = 21.0
     pcb_thickness: float = 1.6
     rj45_width: float = 16.2
     rj45_height: float = 13.8
-    soc_x: float = 4.0          # SoC centre offset from PCB centre (+X)
+    soc_x: float = 4.0
     heatsink_width: float = 14.0
-    heatsink_height: float = 6.0
+    heatsink_height: float = 9.0
 
 
 @dataclass(frozen=True)
 class CameraSpec:
-    """Physical dimensions of the LuckFox SC3336 camera module."""
-
     module_width: float = 25.0
     module_height: float = 24.0
+    module_thickness: float = 2.0
     lens_diameter: float = 15.0
-    ffc_width: float = 16.0
-    ffc_thickness: float = 1.2
 
 
 @dataclass(frozen=True)
 class EnvSpec:
-    """Manufacturing / design parameters for the enclosure itself."""
-
     wall: float = 2.0
     floor: float = 2.0
     standoff: float = 3.5
-    component_clearance: float = 1.0
-    seam_z: float = 13.0
-    clearance: float = 0.6          # minimum PCB clearance inside the body
+    seam_z: float = 9.5
 
-    # Body: a stadium (capsule).  Width is generous so the camera barrel can
-    # sit flush and the silhouette reads rounded rather than plank-like.
-    body_width: float = 30.0
-    body_straight: float = 76.0
+    # Broad, subtly rounded body. Front/rear edges stay flat for ports and a
+    # recessed optical window; this is intentionally not a pill/doorbell shape.
+    body_length: float = 110.0
+    body_width: float = 58.0
+    body_height: float = 34.0
+    corner_radius: float = 9.0
 
-    # Bottom intake vents (cut through the floor, facing downward).
-    intake_slot_width: float = 1.5
-    intake_slot_length: float = 12.0
-    intake_count: int = 3
-    intake_spacing_x: float = 18.0
-    foot_height: float = 3.0
-
-    # Round chimney.
-    chimney_inner_r: float = 10.0   # draft column radius (Ø20)
-    chimney_wall: float = 2.0
-    chimney_outer_height: float = 18.0
-    exhaust_slot_height: float = 8.0
-    cap_overhang: float = 8.0       # rain cap eave beyond the stack
-    cap_thickness: float = 2.0
-    cap_annulus: float = 4.0        # air gap between stack and cap skirt
-    cap_skirt_length: float = 16.0
-    roof_height: float = 4.0
-
-    # Camera nose (cylindrical lens barrel).
-    nose_r: float = 20.0            # outer radius (Ø40)
-    nose_wall: float = 2.0
-    nose_len: float = 20.0
-    nose_rear_opening_r: float = 15.0   # cable/FFC aperture (Ø30)
+    # Recessed optical window / lens position.
+    window_width: float = 20.0
+    window_height: float = 17.0
+    window_corner_radius: float = 2.0
+    window_recess: float = 1.2
     lens_clearance: float = 0.5
-    hood_r: float = 16.0            # lens shade outer radius (Ø32)
-    hood_wall: float = 2.0
-    hood_len: float = 8.0
-    ffc_margin: float = 0.3
+    lens_z: float = 18.0
 
-    # Seam gasket (captured TPU cord).
-    gasket_half_width: float = 0.8
-    gasket_groove_depth: float = 1.2
+    # Broad raised roof canopy. The roof floats on four integrated support
+    # posts, shielding the top/optics while leaving a protected airflow channel.
+    hood_front_overhang: float = 10.0
+    hood_rear_overhang: float = 4.0
+    hood_side_overhang: float = 3.0
+    hood_thickness: float = 3.0
+    hood_gap: float = 8.0
+    hood_corner_radius: float = 12.0
+    hood_slope_x: float = -0.015  # drains toward +X/front
+    hood_post_radius: float = 2.5
+    hood_post_inset_x: float = 8.0
+    hood_post_inset_y: float = 6.0
 
-    # Ports.
-    rj45_port_margin: float = 0.9
-    body_front_opening_r: float = 9.5   # Ø19 barrel<->body aperture
+    # External metal thermal insert seated through a gasketed roof port.
+    thermal_port_width: float = 20.0
+    thermal_port_length: float = 20.0
+    thermal_stem_width: float = 18.0
+    thermal_stem_length: float = 18.0
+    thermal_stem_bottom: float = 17.5
+    thermal_flange_width: float = 28.0
+    thermal_flange_length: float = 26.0
+    thermal_flange_thickness: float = 1.2
+    thermal_fin_height: float = 3.0
+    thermal_fin_thickness: float = 1.2
+    thermal_fin_count: int = 6
+    thermal_seal_width: float = 0.8
 
-    # Edge softening (baked bevel on long hard edges).
-    bevel_offset: float = 2.0
-    bevel_min_len: float = 20.0
+    # Gasket and face drainage.
+    gasket_width: float = 1.6
+    gasket_depth: float = 1.2
+    face_channel_y: float = 15.0
+    face_channel_width: float = 1.2
+    face_channel_depth: float = 1.0
+
+    # Rear connector.
+    rj45_margin: float = 0.9
+
+    # Printed shell edge softening.
+    bevel_offset: float = 1.5
+    bevel_min_len: float = 28.0
     bevel_angle_deg: float = 40.0
-
     tolerance: float = 1e-6
 
 
 @dataclass
 class Model:
-    """Fully-computed dimensional model of the enclosure."""
-
     board: BoardSpec = field(default_factory=BoardSpec)
     camera: CameraSpec = field(default_factory=CameraSpec)
     env: EnvSpec = field(default_factory=EnvSpec)
 
-    # --- plan ---
-    body_width: float = 0.0
-    body_straight: float = 0.0
-    total_length: float = 0.0
-    end_radius: float = 0.0
-    end_center_x: float = 0.0
-    total_half_x: float = 0.0
+    # Derived shell dimensions.
+    half_x: float = 0.0
+    half_y: float = 0.0
+    inner_length: float = 0.0
     inner_width: float = 0.0
-    inner_half_w: float = 0.0
-    inner_end_radius: float = 0.0
-    inner_half_x: float = 0.0
-
-    # --- z stack ---
+    inner_radius: float = 0.0
+    cover_top: float = 0.0
+    interior_ceiling: float = 0.0
     floor_top: float = 0.0
     pcb_bottom: float = 0.0
     pcb_top: float = 0.0
-    interior_ceiling: float = 0.0
-    cover_top: float = 0.0
 
-    # --- chimney ---
-    stack_inner_r: float = 0.0
-    stack_outer_r: float = 0.0
-    stack_z0: float = 0.0
-    stack_z1: float = 0.0
-    exhaust_z0: float = 0.0
-    exhaust_z1: float = 0.0
-    cap_r: float = 0.0
-    cap_z0: float = 0.0
-    cap_z1: float = 0.0
-    skirt_inner_r: float = 0.0
-    skirt_outer_r: float = 0.0
-    skirt_z0: float = 0.0
-    skirt_z1: float = 0.0
-    roof_apex_z: float = 0.0
+    # Hood envelope.
+    hood_length: float = 0.0
+    hood_width: float = 0.0
+    hood_center_x: float = 0.0
+    hood_x_min: float = 0.0
+    hood_x_max: float = 0.0
+    hood_y_max: float = 0.0
+    hood_bottom: float = 0.0
+    hood_top: float = 0.0
+    hood_post_x: float = 0.0
+    hood_post_y: float = 0.0
 
-    # --- nose ---
-    nose_inner_r: float = 0.0
-    nose_x0: float = 0.0
-    nose_x1: float = 0.0
-    nose_center_z: float = 0.0
+    # Thermal geometry.
+    thermal_center_z: float = 0.0
+    thermal_flange_bottom: float = 0.0
+    thermal_flange_top: float = 0.0
+    thermal_fin_top: float = 0.0
+    thermal_seal_outer_width: float = 0.0
+    thermal_seal_outer_length: float = 0.0
+    thermal_seal_inner_width: float = 0.0
+    thermal_seal_inner_length: float = 0.0
 
-    # --- ports / gasket ---
-    rj45_port_w: float = 0.0
+    # Face / port geometry.
+    window_x: float = 0.0
+    window_z0: float = 0.0
+    window_z1: float = 0.0
+    window_y0: float = 0.0
+    window_y1: float = 0.0
+    lens_port_diameter: float = 0.0
+    rj45_port_width: float = 0.0
     rj45_port_z0: float = 0.0
     rj45_port_z1: float = 0.0
-    rim_outer_hw: float = 0.0
-    rim_inner_hw: float = 0.0
+    seam_path_length: float = 0.0
+    seam_path_width: float = 0.0
+    seam_path_radius: float = 0.0
 
     def recompute(self) -> "Model":
         e, b, c = self.env, self.board, self.camera
-
-        # Plan.
-        self.body_width = e.body_width
-        self.body_straight = e.body_straight
-        self.end_radius = e.body_width / 2.0
-        self.end_center_x = e.body_straight / 2.0
-        self.total_half_x = self.end_center_x + self.end_radius
-        self.total_length = 2 * self.total_half_x
+        self.half_x = e.body_length / 2
+        self.half_y = e.body_width / 2
+        self.inner_length = e.body_length - 2 * e.wall
         self.inner_width = e.body_width - 2 * e.wall
-        self.inner_half_w = self.inner_width / 2.0
-        self.inner_end_radius = self.inner_half_w
-        self.inner_half_x = self.end_center_x + self.inner_end_radius
+        self.inner_radius = e.corner_radius - e.wall
 
-        # Vertical stack.
         self.floor_top = e.floor
         self.pcb_bottom = self.floor_top + e.standoff
         self.pcb_top = self.pcb_bottom + b.pcb_thickness
-        self.interior_ceiling = self.pcb_top + b.rj45_height + e.component_clearance
-        self.cover_top = self.interior_ceiling + e.wall
+        self.interior_ceiling = e.body_height - e.wall
+        self.cover_top = e.body_height
 
-        # Chimney (round).  The aperture is a Ø20 column over the SoC, large
-        # enough to fully overhang a 14x14 heatsink and its corner fins.
-        self.stack_inner_r = e.chimney_inner_r
-        self.stack_outer_r = e.chimney_inner_r + e.chimney_wall
-        self.stack_z0 = self.cover_top
-        self.stack_z1 = self.stack_z0 + e.chimney_outer_height
-        self.exhaust_z0 = self.stack_z1 - e.chimney_wall - e.exhaust_slot_height
-        self.exhaust_z1 = self.stack_z1 - e.chimney_wall
-        self.cap_r = self.stack_outer_r + e.cap_overhang
-        self.cap_z0 = self.stack_z1
-        self.cap_z1 = self.cap_z0 + e.cap_thickness
-        self.skirt_inner_r = self.stack_outer_r + e.cap_annulus
-        self.skirt_outer_r = self.skirt_inner_r + e.chimney_wall
-        self.skirt_z1 = self.cap_z0
-        self.skirt_z0 = self.skirt_z1 - e.cap_skirt_length
-        self.roof_apex_z = self.cap_z1 + e.roof_height
+        self.hood_length = e.body_length + e.hood_front_overhang + e.hood_rear_overhang
+        self.hood_width = e.body_width + 2 * e.hood_side_overhang
+        self.hood_center_x = (e.hood_front_overhang - e.hood_rear_overhang) / 2
+        self.hood_x_min = self.hood_center_x - self.hood_length / 2
+        self.hood_x_max = self.hood_center_x + self.hood_length / 2
+        self.hood_y_max = self.hood_width / 2
+        self.hood_bottom = e.body_height + e.hood_gap
+        self.hood_top = self.hood_bottom + e.hood_thickness
+        self.hood_post_x = self.half_x - e.hood_post_inset_x
+        self.hood_post_y = self.half_y - e.hood_post_inset_y
 
-        # Nose.
-        self.nose_inner_r = e.nose_r - e.nose_wall
-        self.nose_x0 = self.total_half_x + e.wall
-        self.nose_x1 = self.nose_x0 + e.nose_len
-        self.nose_center_z = self.cover_top / 2.0
+        # The thermal flange is sealed against the roof; its fins stay under
+        # the canopy with a free gap above for protected ambient convection.
+        self.thermal_flange_bottom = self.cover_top - 0.15
+        self.thermal_flange_top = self.thermal_flange_bottom + e.thermal_flange_thickness
+        self.thermal_fin_top = self.thermal_flange_top + e.thermal_fin_height
+        self.thermal_center_z = (self.thermal_flange_bottom + self.thermal_flange_top) / 2
+        self.thermal_seal_outer_width = e.thermal_flange_width - 1.0
+        self.thermal_seal_outer_length = e.thermal_flange_length - 1.0
+        self.thermal_seal_inner_width = e.thermal_port_width + 0.4
+        self.thermal_seal_inner_length = e.thermal_port_length + 0.4
 
-        # Ports / gasket.  The gasket channel spans the full 2 mm rim so its walls
-        # coincide with the cavity / shell faces (no thin sliver bands).
-        self.rj45_port_w = b.rj45_width + 2 * e.rj45_port_margin
-        self.rj45_port_z0 = self.pcb_bottom - 1.0
-        self.rj45_port_z1 = self.interior_ceiling
-        self.rim_outer_hw = self.end_radius - 0.5    # gasket band outer edge
-        self.rim_inner_hw = self.inner_half_w + 0.5  # gasket band inner edge
+        self.window_x = self.half_x - 1.5 * e.window_recess
+        self.window_z0 = e.lens_z - e.window_height / 2
+        self.window_z1 = e.lens_z + e.window_height / 2
+        self.window_y0 = -e.window_width / 2
+        self.window_y1 = e.window_width / 2
+        self.lens_port_diameter = c.lens_diameter + 2 * e.lens_clearance
+
+        self.rj45_port_width = b.rj45_width + 2 * e.rj45_margin
+        self.rj45_port_z0 = self.pcb_bottom - 0.5
+        self.rj45_port_z1 = self.pcb_bottom + b.rj45_height + 0.5
+
+        # Gasket track on the horizontal seam; its centreline sits mid-wall.
+        self.seam_path_length = e.body_length - e.wall
+        self.seam_path_width = e.body_width - e.wall
+        self.seam_path_radius = e.corner_radius - e.wall / 2
         return self
 
-    # ------------------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------------------
     def validate(self) -> List[Tuple[str, str]]:
-        """Return ``(severity, message)`` issues; empty list == fully valid."""
         e, b, c = self.env, self.board, self.camera
         issues: List[Tuple[str, str]] = []
 
-        def require(cond: bool, msg: str) -> None:
-            if not cond:
-                issues.append(("error", msg))
+        def require(condition: bool, message: str) -> None:
+            if not condition:
+                issues.append(("error", message))
 
         ep = e.tolerance
+        require(self.inner_length >= b.pcb_length + 2 * e.wall,
+                "PCB length does not fit with shell clearance")
+        require(self.inner_width >= b.pcb_width + 2 * e.wall,
+                "PCB width does not fit with shell clearance")
+        require(self.interior_ceiling - self.pcb_top >= b.rj45_height,
+                "rear connector exceeds internal headroom")
+        require(c.module_width <= self.inner_width,
+                "SC3336 board is wider than the internal shell")
+        require(e.lens_z - c.module_height / 2 >= e.floor - ep and
+                e.lens_z + c.module_height / 2 <= self.interior_ceiling + ep,
+                "SC3336 board height exceeds the internal shell")
 
-        # 1. PCB clears the interior stadium in the straight section.
-        require(self.inner_half_w >= b.pcb_width / 2 + e.clearance - ep,
-                "PCB width lacks the specified radial clearance")
-        require(self.end_center_x >= b.pcb_length / 2 + e.clearance - ep,
-                "PCB length lacks the specified radial clearance")
-        require(self.interior_ceiling - self.pcb_top >= b.rj45_height - ep,
-                "interior is short of the RJ45 cage height")
+        # Lens/module are fully behind the front fascia, with the window inside
+        # the flat portion of the rounded front face.
+        require(e.window_width <= e.body_width - 2 * e.corner_radius,
+                "optical window reaches the front corner radii")
+        require(e.window_height <= e.body_height - 2 * e.wall,
+                "optical window breaks through the top or bottom face")
+        require(e.window_width >= c.lens_diameter + 4.0,
+                "optical window leaves insufficient margin around the lens")
+        require(e.window_height >= c.lens_diameter + 2.0,
+                "optical window leaves insufficient vertical lens margin")
+        require(self.window_z0 >= e.floor + ep and self.window_z1 <= self.interior_ceiling + ep,
+                "optical window is not contained by the front shell")
+        actual_panel_z0 = e.lens_z - (e.window_height - 0.4) / 2
+        require(actual_panel_z0 >= e.seam_z - ep,
+                "shell seam crosses the optical panel")
+        require(self.lens_port_diameter > c.lens_diameter,
+                "M12 lens port has no clearance")
 
-        # 2. Heatsink fully under the round chimney column (corners included).
-        require(2 * self.stack_inner_r >= b.heatsink_width * math_sqrt2() - ep,
-                "round chimney column does not overhang the full heatsink")
-        require(self.stack_z1 - self.stack_z0 > b.heatsink_height,
-                "chimney stack is not taller than the heatsink")
+        # The canopy is deliberately the only external overhang.  Optics and
+        # thermal hardware stay inside the body footprint.
+        require(self.hood_x_max >= self.half_x + e.hood_front_overhang - ep,
+                "canopy does not project over the lens face")
+        require(self.hood_width >= e.body_width + 2 * e.hood_side_overhang - ep,
+                "canopy is narrower than the body plus eaves")
+        require(self.hood_bottom - self.cover_top >= 5.0,
+                "canopy airflow gap is too small")
+        require(self.thermal_fin_top < self.hood_bottom - 1.0,
+                "thermal fins collide with the canopy")
+        require(e.hood_slope_x < 0,
+                "hood roof must pitch toward the front drip edge")
 
-        # 3. Lens and FFC pass-throughs are large enough.
-        require(self.e_lens_port_dia() > c.lens_diameter, "lens port smaller than barrel")
-        require(c.ffc_width + 2 * e.ffc_margin > c.ffc_width,
-                "FFC slot narrower than cable")
-        require(1.2 + 2 * e.ffc_margin > c.ffc_thickness,
-                "FFC slot thinner than cable")
-        # The camera module (25x24) must seat inside the round barrel.
-        module_diag = (c.module_width ** 2 + c.module_height ** 2) ** 0.5
-        require(2 * self.nose_inner_r >= module_diag - ep,
-                "camera module diagonal does not fit the nose barrel")
+        require(e.thermal_port_width < e.thermal_flange_width,
+                "thermal insert flange does not overlap its roof port")
+        require(e.thermal_port_length < e.thermal_flange_length,
+                "thermal insert flange does not overlap its roof port")
+        require(self.board.soc_x - e.thermal_stem_length / 2 >= -self.half_x + e.wall,
+                "thermal stem approaches the rear wall")
+        require(self.board.soc_x + e.thermal_stem_length / 2 <= self.half_x - e.wall,
+                "thermal stem approaches the front wall")
+        require(self.thermal_fin_top < self.hood_bottom - ep,
+                "thermal fin pack has no air clearance")
 
-        # 4. Symmetry & rounding intent.
-        require(self.end_radius >= e.body_width / 2 - ep,
-                "body ends are not full semicircles (asymmetric plan)")
-        require(e.roof_height > 0, "rain cap roof must pitch water off")
-        require(e.bevel_offset > 0, "edge rounding is disabled")
-        require(abs(self.board.soc_x) <= e.body_straight / 4,
-                "chimney sits far off the body centre")
+        require(self.rj45_port_z0 >= e.floor - ep and
+                self.rj45_port_z1 <= self.interior_ceiling + ep,
+                "RJ45 port falls outside the body walls")
+        require(e.face_channel_y + e.face_channel_width / 2 < self.half_y - e.corner_radius,
+                "front water channels cross into the rounded corners")
+        require(e.gasket_width > 0 and e.gasket_depth > 0,
+                "main housing gasket dimensions must be positive")
 
-        # 5. Weather-proofing.
-        require(self.skirt_z0 <= self.exhaust_z0 - ep,
-                "cap skirt does not drop below the exhaust slots")
-        require(self.skirt_inner_r > self.stack_outer_r,
-                "no annulus between stack and cap skirt")
-        require(self.skirt_outer_r <= self.cap_r + ep,
-                "cap eave does not overhang the skirt")
-        require((self.skirt_z1 - self.skirt_z0) >= (self.exhaust_z1 - self.exhaust_z0),
-                "skirt shorter than the exhaust opening")
-        require(self.e_intake_top() <= self.pcb_bottom + ep,
-                "intake opens above the PCB plenum")
-        require(e.foot_height >= 2.0, "feet too short to let air under the floor")
-
-        # 6. Ports stay within the interior / walls.
-        require(self.rj45_port_z1 <= self.interior_ceiling + ep,
-                "RJ45 port breaches the top wall")
-        require(self.rj45_port_z0 >= self.floor_top - ep,
-                "RJ45 port dips below the floor")
-
-        # 7. Stack stays within the body plan; cap may eave over but stays sane.
-        require(self.board.soc_x + self.stack_outer_r <= self.total_half_x,
-                "chimney stack protrudes beyond the body length")
-        require(self.stack_outer_r <= self.inner_half_w + e.wall - ep,
-                "chimney stack protrudes beyond the body width")
-
-        # 8. Minimalist footprint (hard upper bounds).
-        require(self.total_length <= 125.0, "enclosure too long")
-        require(self.body_width <= 40.0, "enclosure too wide")
-        require(self.roof_apex_z <= 55.0, "enclosure too tall")
+        require(e.body_length >= b.pcb_length + 2 * e.wall + 20,
+                "body lacks room for front optics and rear connector")
+        require(e.body_width >= e.window_width + 2 * e.corner_radius,
+                "body does not contain the full recessed window")
         return issues
 
-    # ------------------------------------------------------------------
-    # Accessors
-    # ------------------------------------------------------------------
-    def e_lens_port_dia(self) -> float:
-        return self.camera.lens_diameter + 2 * self.env.lens_clearance
-
-    def e_intake_top(self) -> float:
-        return self.floor_top
-
-    def e_ffc_slot(self) -> Vec:
-        c, e = self.camera, self.env
-        return (c.ffc_width + 2 * e.ffc_margin, c.ffc_thickness + 2 * e.ffc_margin)
-
-    def e_intake_xs(self) -> List[float]:
-        e = self.env
-        mid = (e.intake_count - 1) / 2
-        return [(i - mid) * e.intake_spacing_x for i in range(e.intake_count)]
-
-    def e_nose_center(self) -> Vec:
-        return ((self.nose_x0 + self.nose_x1) / 2, 0.0, self.nose_center_z)
-
-    # ------------------------------------------------------------------
-    # Primitive build list
-    # ------------------------------------------------------------------
     def primitives(self) -> List[Dict]:
-        e, b = self.env, self.board
+        e, b, c = self.env, self.board, self.camera
+        px = self.half_x
+        wmid = e.lens_z
+        p: List[Dict] = []
 
-        def boxc(cx, cy, cz, sx, sy, sz) -> Dict:
-            return {"center": (cx, cy, cz), "size": (sx, sy, sz)}
+        def add_round(op, part, name, center, length, width, radius, z0, z1,
+                      material=None, **extra):
+            item = {"op": op, "part": part, "name": name, "center": center,
+                    "length": length, "width": width, "radius": radius,
+                    "z0": z0, "z1": z1, **extra}
+            if material is not None:
+                item["material"] = material
+            return item
 
-        prims: List[Dict] = []
+        def box(center, size):
+            return {"center": center, "size": size}
 
-        # ============================ BASE =============================
-        prims.append({"op": "add_stadium", "part": "base", "name": "Base_Tub",
-                      "material": "petg", "center": (0, 0, e.seam_z / 2),
-                      "straight": e.body_straight, "half_width": self.end_radius,
-                      "z0": 0.0, "z1": e.seam_z})
-        prims.append({"op": "sub_stadium", "part": "base", "target": "Base_Tub",
-                      "name": "Base_Cavity",
-                      "center": (0, 0, (self.floor_top + e.seam_z) / 2),
-                      "straight": e.body_straight, "half_width": self.inner_half_w,
-                      "z0": self.floor_top, "z1": e.seam_z + 4.0})
-        # RJ45 port, lower half, on the rear dome.
-        prims.append({"op": "sub_box", "part": "base", "target": "Base_Tub",
-                      "name": "RJ45_Port_Lower",
-                      **boxc(-self.total_half_x, 0, (self.rj45_port_z0 + e.seam_z) / 2,
-                             6 * e.wall, self.rj45_port_w, e.seam_z - self.rj45_port_z0)})
-        # Downward-facing intake slots through the floor.
-        for i, x in enumerate(self.e_intake_xs()):
-            prims.append({"op": "sub_box", "part": "base", "target": "Base_Tub",
-                          "name": f"Intake_Slot_{i}",
-                          **boxc(x, 0, e.floor / 2,
-                                 e.intake_slot_length, e.intake_slot_width, e.floor * 3)})
-        # Drain weeps at the front of the floor.
-        for i, y in enumerate((10.0, -10.0)):
-            prims.append({"op": "sub_cylinder", "part": "base", "target": "Base_Tub",
-                          "name": f"Drain_Weep_{i}", "axis": "Z",
-                          "center": (28.0, y, e.floor / 2),
-                          "radius": 0.6, "depth": e.floor * 3})
-        # Standoff bosses for the PCB (bottoms penetrate the floor).
-        for i, (sx, sy) in enumerate(((30.0, 8.0), (30.0, -8.0),
-                                      (-30.0, 8.0), (-30.0, -8.0))):
-            prims.append({"op": "add_cylinder", "part": "base", "reference": False,
-                          "name": f"Standoff_{i}", "material": "petg", "axis": "Z",
-                          "center": (sx, sy, (self.floor_top - 0.1 + self.pcb_bottom) / 2),
-                          "radius": 3.0,
-                          "depth": self.pcb_bottom - self.floor_top + 0.1})
-        # Feet (tops penetrate the floor underside).
-        for i, (fx, fy) in enumerate(((28.0, 10.0), (28.0, -10.0),
-                                      (-28.0, 10.0), (-28.0, -10.0))):
-            prims.append({"op": "add_box", "part": "base", "reference": False,
-                          "name": f"Foot_{i}", "material": "petg",
-                          **boxc(fx, fy, (-e.foot_height + 0.05) / 2,
-                                 8.0, 8.0, e.foot_height + 0.05)})
-        # Front dome opening matching the camera barrel (FFC / cable path).
-        prims.append({"op": "sub_cylinder", "part": "base", "target": "Base_Tub",
-                      "name": "Front_Opening_Base", "axis": "X",
-                      "center": (self.total_half_x - e.wall, 0, self.nose_center_z),
-                      "radius": e.body_front_opening_r, "depth": 2 * e.wall + 2.0})
-        _add_gasket_grooves(self, prims)
+        # ---------------------------- lower shell ----------------------------
+        p.append(add_round("add_roundrect", "base", "Base_Tub", (0, 0, 0),
+                           e.body_length, e.body_width, e.corner_radius,
+                           0.0, e.seam_z, "petg"))
+        p.append(add_round("sub_roundrect", "base", "Base_Cavity", (0, 0, 0),
+                           self.inner_length, self.inner_width, self.inner_radius,
+                           e.floor, e.seam_z + 1.0, target="Base_Tub"))
 
-        # ============================ COVER ============================
-        cover_c = (e.seam_z + self.cover_top) / 2
-        prims.append({"op": "add_stadium", "part": "cover", "name": "Top_Cover",
-                      "material": "cover",
-                      "center": (0, 0, cover_c),
-                      "straight": e.body_straight, "half_width": self.end_radius,
-                      "z0": e.seam_z, "z1": self.cover_top})
-        prims.append({"op": "sub_stadium", "part": "cover", "target": "Top_Cover",
-                      "name": "Cover_Cavity",
-                      "center": (0, 0, (e.seam_z + self.interior_ceiling) / 2),
-                      "straight": e.body_straight, "half_width": self.inner_half_w,
-                      "z0": e.seam_z - 4.0, "z1": self.interior_ceiling})
-        # Round chimney aperture through the cover top wall, over the SoC.
-        prims.append({"op": "sub_cylinder", "part": "cover", "target": "Top_Cover",
-                      "name": "Chimney_Aperture", "axis": "Z",
-                      "center": (b.soc_x, 0, self.interior_ceiling),
-                      "radius": self.stack_inner_r, "depth": 2 * e.wall + 6.0})
-        # RJ45 port, upper half.
-        prims.append({"op": "sub_box", "part": "cover", "target": "Top_Cover",
-                      "name": "RJ45_Port_Upper",
-                      **boxc(-self.total_half_x, 0, (e.seam_z + self.rj45_port_z1) / 2,
-                             6 * e.wall, self.rj45_port_w, self.rj45_port_z1 - e.seam_z)})
-        # Front dome opening aligning the body interior with the camera barrel
-        # (FFC / cable path); small enough to keep the shell walls intact.
-        prims.append({"op": "sub_cylinder", "part": "cover", "target": "Top_Cover",
-                      "name": "Front_Opening_Cover", "axis": "X",
-                      "center": (self.total_half_x - e.wall, 0, self.nose_center_z),
-                      "radius": e.body_front_opening_r, "depth": 2 * e.wall + 2.0})
+        # The flat recessed optical panel crosses the shell split.  Cut both
+        # halves so the clear panel can seat in one continuous rounded pocket.
+        win_size = (4 * e.wall, e.window_width, e.window_height + 0.4)
+        win_c = (px, 0, wmid)
 
-        # =========================== CHIMNEY ===========================
-        chim_c = (b.soc_x, 0, (self.stack_z0 + self.stack_z1) / 2)
-        prims.append({"op": "add_cyl_ring", "part": "chimney", "name": "Chimney_Stack",
-                      "material": "cover", "center": chim_c,
-                      "r_outer": self.stack_outer_r, "r_inner": self.stack_inner_r,
-                      "z0": self.stack_z0, "z1": self.stack_z1})
-        for i, (cx, cy, sx, sy) in enumerate(self._exhaust_cutters()):
-            prims.append({"op": "sub_box", "part": "chimney", "target": "Chimney_Stack",
-                          "name": f"Exhaust_Slot_{i}",
-                          **boxc(cx, cy, (self.exhaust_z0 + self.exhaust_z1) / 2,
-                                 sx, sy, self.exhaust_z1 - self.exhaust_z0)})
-        prims.append({"op": "add_cylinder", "part": "chimney", "reference": False,
-                      "name": "Rain_Cap_Plate", "material": "cover", "axis": "Z",
-                      "center": (b.soc_x, 0, (self.cap_z0 - 0.1 + self.cap_z1) / 2),
-                      "radius": self.cap_r, "depth": e.cap_thickness + 0.1})
-        prims.append({"op": "add_cyl_ring", "part": "chimney", "reference": False,
-                      "name": "Rain_Cap_Skirt", "material": "cover",
-                      "center": (b.soc_x, 0, (self.skirt_z0 + self.cap_z0 + 0.1) / 2),
-                      "r_outer": self.skirt_outer_r, "r_inner": self.skirt_inner_r,
-                      "z0": self.skirt_z0, "z1": self.cap_z0 + 0.1})
-        prims.append({"op": "add_cone", "part": "chimney", "reference": False,
-                      "name": "Rain_Cap_Roof", "material": "cover", "axis": "Z",
-                      "center": (b.soc_x, 0, self.cap_z1),
-                      "radius1": self.cap_r, "radius2": 0.0,
-                      "depth": e.roof_height})
+        # Bottom half of the RJ45 opening in the rear wall.
+        p.append({"op": "sub_box", "part": "base", "target": "Base_Tub",
+                  "name": "RJ45_Port_Lower",
+                  **box((-px, 0, (self.rj45_port_z0 + e.seam_z) / 2),
+                        (6 * e.wall, self.rj45_port_width,
+                         e.seam_z - self.rj45_port_z0))})
 
-        # ============================ NOSE =============================
-        nose_c = self.e_nose_center()
-        prims.append({"op": "add_cylinder", "part": "nose", "name": "Camera_Nose",
-                      "material": "petg", "axis": "X", "center": nose_c,
-                      "radius": e.nose_r, "depth": e.nose_len})
-        # Interior barrel (leaves 2 mm front + rear walls).
-        prims.append({"op": "sub_cylinder", "part": "nose", "target": "Camera_Nose",
-                      "name": "Nose_Cavity", "axis": "X",
-                      "center": (nose_c[0], nose_c[1], nose_c[2]),
-                      "radius": self.nose_inner_r,
-                      "depth": e.nose_len - 2 * e.nose_wall})
-        # Rear opening to the body (FFC / cable path).
-        prims.append({"op": "sub_cylinder", "part": "nose", "target": "Camera_Nose",
-                      "name": "Nose_Rear_Opening", "axis": "X",
-                      "center": (self.nose_x0 + e.nose_wall / 2, 0, self.nose_center_z),
-                      "radius": e.nose_rear_opening_r, "depth": e.nose_wall + 1.0})
-        # M12 lens port through the front wall.
-        prims.append({"op": "sub_cylinder", "part": "nose", "target": "Camera_Nose",
-                      "name": "Lens_Port", "axis": "X",
-                      "center": (self.nose_x1 - e.nose_wall / 2, 0, self.nose_center_z),
-                      "radius": self.e_lens_port_dia() / 2, "depth": e.nose_wall + 1.0})
-        # Lens shade: a short open tube protruding from the front face.
-        shade_x0 = self.nose_x1 - 0.1
-        prims.append({"op": "add_cyl_ring", "part": "nose", "reference": False,
-                      "name": "Lens_Shade", "material": "petg", "axis": "X",
-                      "center": (shade_x0 + e.hood_len / 2, 0, self.nose_center_z),
-                      "r_outer": e.hood_r, "r_inner": e.hood_r - e.hood_wall,
-                      "z0": shade_x0, "z1": shade_x0 + e.hood_len})
+        # Drainage grooves beside the optical window, running from under the
+        # hood to the lower fascia.  Each half lines up at the seam.
+        for side in (-1, 1):
+            y = side * e.face_channel_y
+            p.append({"op": "sub_box", "part": "base", "target": "Base_Tub",
+                      "name": f"Front_Drain_Channel_Lower_{side}",
+                      **box((px, y, (e.floor + e.seam_z) / 2),
+                            (2 * e.face_channel_depth, e.face_channel_width,
+                             e.seam_z - e.floor))})
 
-        # =========================== GASKET ============================
-        gasket_depth = 2 * e.gasket_groove_depth
-        prims.append({"op": "add_stadium_ring", "part": "gasket", "name": "Gasket_Seal",
-                      "material": "tpu", "center": (0, 0, e.seam_z),
-                      "straight": e.body_straight,
-                      "outer_hw": self.rim_outer_hw, "inner_hw": self.rim_inner_hw,
-                      "z0": e.seam_z - gasket_depth, "z1": e.seam_z})
+        # Gasket groove in the lower shell rim only.  The cover's rim stays
+        # flat and compresses the gasket bead.
+        p.append({"op": "sub_roundrect_ring", "part": "base", "target": "Base_Tub",
+                  "name": "Main_Gasket_Groove",
+                  "center": (0, 0, e.seam_z - e.gasket_depth / 2),
+                  "outer_length": self.seam_path_length + e.gasket_width,
+                  "outer_width": self.seam_path_width + e.gasket_width,
+                  "outer_radius": self.seam_path_radius + e.gasket_width / 2,
+                  "inner_length": self.seam_path_length - e.gasket_width,
+                  "inner_width": self.seam_path_width - e.gasket_width,
+                  "inner_radius": self.seam_path_radius - e.gasket_width / 2,
+                  "z0": e.seam_z - e.gasket_depth, "z1": e.seam_z + 0.3})
 
-        prims.extend(self._reference_proxies())
-        return prims
+        # ---------------------------- upper shell ----------------------------
+        p.append(add_round("add_roundrect", "cover", "Top_Cover", (0, 0, 0),
+                           e.body_length, e.body_width, e.corner_radius,
+                           e.seam_z, e.body_height, "cover"))
+        p.append(add_round("sub_roundrect", "cover", "Cover_Cavity", (0, 0, 0),
+                           self.inner_length, self.inner_width, self.inner_radius,
+                           e.seam_z - 0.3, self.interior_ceiling, target="Top_Cover"))
 
-    def _exhaust_cutters(self) -> List[Tuple[float, float, float, float]]:
-        # Each cutter spans from inside the inner wall (r_inner) to outside the
-        # outer wall (r_outer) centred on their mean radius, and across the full
-        # inner diameter, so the slot breaks completely through the curved wall.
-        mid = (self.stack_inner_r + self.stack_outer_r) / 2
-        d = 2 * self.stack_inner_r
-        return [
-            (self.board.soc_x + mid, 0.0, 6.0, d),
-            (self.board.soc_x - mid, 0.0, 6.0, d),
-            (self.board.soc_x, mid, d, 6.0),
-            (self.board.soc_x, -mid, d, 6.0),
-        ]
+        p.append({"op": "sub_rounded_box", "part": "cover", "target": "Top_Cover",
+                  "name": "Optical_Window_Pocket_Upper",
+                  **box(win_c, win_size), "radius": e.window_corner_radius})
+
+        # Flush/recessed optical glass panel. It is a visual/optical component,
+        # not a printed housing part.
+        p.append({"op": "add_rounded_box", "part": "window", "name": "Optical_Window",
+                  "material": "glass",
+                  "center": (px - 1.5 * e.window_recess, 0, wmid),
+                  "size": (e.window_recess, e.window_width - 0.4,
+                           e.window_height - 0.4),
+                  "radius": e.window_corner_radius})
+        p.append({"op": "add_cyl_ring", "part": "window", "name": "M12_Lens_Bezel",
+                  "material": "alu", "axis": "X",
+                  "center": (self.window_x - 0.85, 0, wmid),
+                  "r_outer": 8.6, "r_inner": 7.8, "depth": 0.3})
+        p.append({"op": "add_cylinder", "part": "window", "name": "M12_Lens_Element",
+                  "material": "lens", "axis": "X",
+                  "center": (self.window_x - 1.0, 0, wmid),
+                  "radius": self.lens_port_diameter / 2 - 0.2, "depth": 0.3})
+
+        # Upper half of the optical pocket, rear RJ45 port, and front drains.
+        p.append({"op": "sub_box", "part": "cover", "target": "Top_Cover",
+                  "name": "RJ45_Port_Upper",
+                  **box((-px, 0, (e.seam_z + self.rj45_port_z1) / 2),
+                        (6 * e.wall, self.rj45_port_width,
+                         self.rj45_port_z1 - e.seam_z))})
+        for side in (-1, 1):
+            y = side * e.face_channel_y
+            p.append({"op": "sub_box", "part": "cover", "target": "Top_Cover",
+                      "name": f"Front_Drain_Channel_Upper_{side}",
+                      **box((px, y, (e.seam_z + self.window_z1 + 1.0) / 2),
+                            (2 * e.face_channel_depth, e.face_channel_width,
+                             self.window_z1 + 1.0 - e.seam_z))})
+
+        # Gasketed thermal port through the roof over the RV1106 SoC.
+        p.append({"op": "sub_box", "part": "cover", "target": "Top_Cover",
+                  "name": "Thermal_Insert_Port",
+                  **box((b.soc_x, 0, e.body_height - e.wall / 2),
+                        (e.thermal_port_length, e.thermal_port_width,
+                         e.wall + 4.0))})
+
+        # Four recessed post sockets. They are blind and stay outside the
+        # gasketed electronics cavity.
+        for ix, x in enumerate((-self.hood_post_x, self.hood_post_x)):
+            for iy, y in enumerate((-self.hood_post_y, self.hood_post_y)):
+                p.append({"op": "sub_cylinder", "part": "cover", "target": "Top_Cover",
+                          "name": f"Hood_Post_Socket_{ix}_{iy}", "axis": "Z",
+                          "center": (x, y, e.body_height - 0.45),
+                          "radius": e.hood_post_radius + 0.25, "depth": 1.2})
+
+        # ---------------------------- top canopy -----------------------------
+        hood_z0 = self.hood_bottom
+        hood_z1 = self.hood_top
+        p.append(add_round("add_roundrect", "hood", "Canopy_Roof",
+                           (self.hood_center_x, 0, 0), self.hood_length,
+                           self.hood_width, e.hood_corner_radius,
+                           hood_z0, hood_z1, "cover",
+                           slope_x=e.hood_slope_x))
+        # Pilasters terminate just inside the roof and the blind sockets.
+        for ix, x in enumerate((-self.hood_post_x, self.hood_post_x)):
+            for iy, y in enumerate((-self.hood_post_y, self.hood_post_y)):
+                p.append({"op": "add_cylinder", "part": "hood", "reference": False,
+                          "name": f"Canopy_Pillar_{ix}_{iy}", "material": "cover",
+                          "axis": "Z", "center": (x, y, (self.cover_top + hood_z0) / 2),
+                          "radius": e.hood_post_radius,
+                          "depth": hood_z0 - self.cover_top + 0.2})
+
+        # ------------------------- main seam gasket --------------------------
+        ring_center_z = e.seam_z - e.gasket_depth / 2
+        p.append({"op": "add_roundrect_ring", "part": "gasket", "name": "Main_Gasket",
+                  "material": "tpu", "center": (0, 0, ring_center_z),
+                  "outer_length": self.seam_path_length + e.gasket_width,
+                  "outer_width": self.seam_path_width + e.gasket_width,
+                  "outer_radius": self.seam_path_radius + e.gasket_width / 2,
+                  "inner_length": self.seam_path_length - e.gasket_width,
+                  "inner_width": self.seam_path_width - e.gasket_width,
+                  "inner_radius": self.seam_path_radius - e.gasket_width / 2,
+                  "z0": e.seam_z - e.gasket_depth,
+                  "z1": e.seam_z + 0.2})
+
+        # A second thin seal below the thermal-insert flange. Directly-built
+        # ring geometry, not a subtractive cutter.
+        p.append({"op": "add_roundrect_ring", "part": "thermal_seal",
+                  "name": "Thermal_Insert_Seal", "material": "tpu",
+                  "center": (b.soc_x, 0, self.thermal_flange_bottom + 0.05),
+                  "outer_length": self.thermal_seal_outer_length,
+                  "outer_width": self.thermal_seal_outer_width,
+                  "outer_radius": 2.0,
+                  "inner_length": self.thermal_seal_inner_length,
+                  "inner_width": self.thermal_seal_inner_width,
+                  "inner_radius": 1.0,
+                  "z0": self.thermal_flange_bottom - 0.35,
+                  "z1": self.thermal_flange_bottom + 0.45})
+
+        # ---------------------- metal thermal insert -------------------------
+        # A separate metal part bridges the SoC heatsink through the sealed
+        # roof port; its low fins live in the ventilated, rain-sheltered canopy.
+        p.append({"op": "add_box", "part": "thermal_insert", "name": "Thermal_Stem",
+                  "material": "alu", "center": (b.soc_x, 0,
+                  (e.thermal_stem_bottom + self.thermal_flange_bottom + 0.2) / 2),
+                  "size": (e.thermal_stem_length, e.thermal_stem_width,
+                           self.thermal_flange_bottom - e.thermal_stem_bottom + 0.2)})
+        p.append({"op": "add_box", "part": "thermal_insert", "reference": False,
+                  "name": "Thermal_Flange", "material": "alu",
+                  "center": (b.soc_x, 0, self.thermal_center_z),
+                  "size": (e.thermal_flange_length, e.thermal_flange_width,
+                           e.thermal_flange_thickness)})
+        # Fin positions spread evenly across the plate's Y dimension.
+        fin_span = e.thermal_flange_width - 4.0
+        if e.thermal_fin_count > 1:
+            step = fin_span / (e.thermal_fin_count - 1)
+        else:
+            step = 0.0
+        for i in range(e.thermal_fin_count):
+            fy = -fin_span / 2 + i * step
+            p.append({"op": "add_box", "part": "thermal_insert", "reference": False,
+                      "name": f"Thermal_Fin_{i}", "material": "alu",
+                      "center": (b.soc_x, fy,
+                                 self.thermal_flange_top + e.thermal_fin_height / 2 - 0.05),
+                      "size": (e.thermal_flange_length - 4.0,
+                               e.thermal_fin_thickness,
+                               e.thermal_fin_height + 0.1)})
+
+        # ------------------------- visual references -------------------------
+        p.extend(self._reference_proxies())
+        return p
 
     def _reference_proxies(self) -> List[Dict]:
-        b, e = self.board, self.env
-        nose_c = self.e_nose_center()
-        return [
+        b, c, e = self.board, self.camera, self.env
+        pcb_z = self.pcb_bottom + b.pcb_thickness / 2
+        sink_bottom = self.pcb_top + 1.2
+        sink_top = sink_bottom + b.heatsink_height
+        cam_board_x = self.half_x - e.wall - c.module_thickness / 2 - 1.0
+        refs = [
             {"op": "add_box", "part": "ref", "name": "PCB_Proxy", "material": "pcb",
-             "center": (0, 0, self.pcb_bottom + b.pcb_thickness / 2),
-             "size": (b.pcb_length, b.pcb_width, b.pcb_thickness), "reference": True},
+             "center": (0, 0, pcb_z), "size": (b.pcb_length, b.pcb_width,
+                                                  b.pcb_thickness), "reference": True},
             {"op": "add_box", "part": "ref", "name": "RJ45_Proxy", "material": "ref",
-             "center": (-self.inner_half_x + 8.0, 0, self.pcb_bottom + b.rj45_height / 2),
-             "size": (21.0, b.rj45_width, b.rj45_height), "reference": True},
-            {"op": "add_box", "part": "ref", "name": "Heatsink_Proxy", "material": "alu",
-             "center": (b.soc_x, 0, self.pcb_top + 1.2 + b.heatsink_height / 2),
-             "size": (b.heatsink_width, b.heatsink_width, b.heatsink_height),
+             "center": (-self.half_x + 10.0, 0,
+                        self.pcb_bottom + b.rj45_height / 2),
+             "size": (20.0, b.rj45_width, b.rj45_height), "reference": True},
+            {"op": "add_box", "part": "ref", "name": "SC3336_Board_Proxy", "material": "pcb",
+             "center": (cam_board_x, 0, e.lens_z),
+             "size": (c.module_thickness, c.module_width, c.module_height),
              "reference": True},
-            {"op": "add_cylinder", "part": "ref", "name": "Lens_Proxy", "material": "ref",
-             "axis": "X",
-             "center": (self.nose_x1 - 4.0, 0, self.nose_center_z),
-             "radius": self.camera.lens_diameter / 2, "depth": 12.0, "reference": True},
-            {"op": "add_box", "part": "ref", "name": "SC3336_Proxy", "material": "pcb",
-             "center": (self.nose_x0 + 3.0, 0, self.nose_center_z),
-             "size": (2.0, self.camera.module_width, self.camera.module_height),
-             "reference": True},
+            {"op": "add_cylinder", "part": "ref", "name": "M12_Lens_Proxy",
+             "material": "ref", "axis": "X",
+             "center": (self.half_x - e.wall - 5.0, 0, e.lens_z),
+             "radius": c.lens_diameter / 2, "depth": 7.0, "reference": True},
+            {"op": "add_box", "part": "ref", "name": "RV1106_Heatsink_Proxy",
+             "material": "alu", "center": (b.soc_x, 0,
+                         sink_bottom + b.heatsink_height / 2),
+             "size": (b.heatsink_width, b.heatsink_width,
+                      b.heatsink_height), "reference": True},
+            {"op": "add_box", "part": "ref", "name": "Thermal_Contact_Pad_Proxy",
+             "material": "ref", "center": (b.soc_x, 0, sink_top + 0.15),
+             "size": (e.thermal_stem_length - 1.0,
+                      e.thermal_stem_width - 1.0, 0.3), "reference": True},
         ]
+        return refs
 
 
-def _add_gasket_grooves(m: "Model", prims: List[Dict]) -> None:
-    e = m.env
-    # The single gasket channel lives in the base (the cover rim is flat and
-    # compresses against it).  It over-pierces the seam so the cutter does not
-    # sit coplanar with the rim face (that is what produces zero-area slivers).
-    depth = 2 * e.gasket_groove_depth
-    prims.append({"op": "sub_stadium_ring", "part": "base", "target": "Base_Tub",
-                  "name": "Gasket_Groove_Base",
-                  "center": (0, 0, (e.seam_z - depth + e.seam_z) / 2),
-                  "straight": e.body_straight,
-                  "outer_hw": m.rim_outer_hw, "inner_hw": m.rim_inner_hw,
-                  "z0": e.seam_z - depth, "z1": e.seam_z + 2.0})
-
-
-def math_sqrt2() -> float:
-    return 1.4142135623730951
+def rectangle_loop(length: float, width: float, radius: float, segments: int = 8):
+    """Return a CCW rounded-rectangle outline centered at the origin."""
+    hx, hy = length / 2, width / 2
+    r = min(radius, hx, hy)
+    out = []
+    corners = ((hx - r, hy - r, 0), (-hx + r, hy - r, 90),
+               (-hx + r, -hy + r, 180), (hx - r, -hy + r, 270))
+    for cx, cy, start_deg in corners:
+        for i in range(segments + 1):
+            a = (start_deg + 90 * i / segments) * 3.141592653589793 / 180
+            out.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return out
