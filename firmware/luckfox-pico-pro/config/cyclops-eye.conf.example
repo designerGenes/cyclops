@@ -7,7 +7,7 @@ cyclops_url=http://cyclops.local:8080
 # Empty selects the first non-loopback/non-Tailscale IPv4 address at startup.
 advertise_host=
 camera_id=0
-iq_dir=/etc/iqfiles
+iq_dir=/oem/usr/share/iqfiles
 rtsp_port=8554
 control_port=8800
 heartbeat_seconds=15

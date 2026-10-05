@@ -36,7 +36,9 @@ void eye_config_defaults(eye_config_t *config) {
     config->heartbeat_seconds = 15;
     config->thermal_poll_seconds = 5;
     config->reboot_after_unreachable_seconds = 600;
-    (void)copy_value(config->iq_dir, sizeof(config->iq_dir), "/etc/iqfiles");
+    /* Luckfox's official Pro/Max SPI-NAND Buildroot image installs the
+     * sensor tuning profiles in its OEM partition. */
+    (void)copy_value(config->iq_dir, sizeof(config->iq_dir), "/oem/usr/share/iqfiles");
 }
 
 bool eye_config_is_valid(const eye_config_t *config) {

@@ -1,0 +1,68 @@
+# Cyclops eye app package for the Luckfox SDK (RV1106 Pro/Max).
+# Mirrors project/app/rkipc/Makefile's variable contract so `./build.sh app`
+# cross-compiles the daemon and stages it into the OEM partition output.
+
+ifeq ($(APP_PARAM), )
+    APP_PARAM:=../Makefile.param
+    include $(APP_PARAM)
+endif
+
+export LC_ALL=C
+SHELL:=/bin/bash
+
+CURRENT_DIR := $(shell pwd)
+PKG_NAME := cyclops_eye
+PKG_BIN ?= out
+
+SRC_DIR := $(CURRENT_DIR)/cyclops/src
+INC_DIR := $(CURRENT_DIR)/cyclops/include
+
+CROSS   := $(RK_APP_CROSS)
+MEDIA   := $(RK_APP_MEDIA_INCLUDE_PATH)
+MEDIALIB:= $(RK_APP_MEDIA_LIBS_PATH)
+
+CFLAGS += -O2 -Wall -Wextra -std=c11 -D_GNU_SOURCE \
+          -I$(INC_DIR) \
+          -I$(MEDIA) \
+          -I$(MEDIA)/libdrm \
+          -I$(MEDIA)/rkaiq \
+          -I$(MEDIA)/rkaiq/uAPI \
+          -I$(MEDIA)/rkaiq/uAPI2 \
+          -I$(MEDIA)/rkaiq/algos \
+          -I$(MEDIA)/rkaiq/common \
+          -I$(MEDIA)/rkaiq/xcore \
+          -I$(MEDIA)/rkaiq/iq_parser \
+          -I$(MEDIA)/rkaiq/iq_parser_v2
+LDFLAGS += -L$(MEDIALIB) -L$(RK_APP_OUTPUT)/lib \
+           -Wl,-rpath-link,$(MEDIALIB):$(RK_APP_OUTPUT)/lib
+LDLIBS  += -lpthread -lrtsp -lrockit -lrockchip_mpp -lrkaiq -lm
+
+# config_check.c is the host-only config validator (has its own main); exclude it.
+SOURCES := $(filter-out $(SRC_DIR)/config_check.c,$(wildcard $(SRC_DIR)/*.c))
+OBJECTS := $(patsubst $(SRC_DIR)/%.c,$(PKG_BIN)/%.o,$(SOURCES))
+
+all: $(PKG_BIN)/bin/cyclops-eye install-extras
+	$(call MAROC_COPY_PKG_TO_APP_OUTPUT, $(RK_APP_OUTPUT), $(PKG_BIN))
+	@echo "build $(PKG_NAME) done"
+
+$(PKG_BIN)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(PKG_BIN)
+	$(CROSS)-gcc $(CFLAGS) -c $< -o $@
+
+$(PKG_BIN)/bin/cyclops-eye: $(OBJECTS)
+	@mkdir -p $(PKG_BIN)/bin
+	$(CROSS)-gcc $(LDFLAGS) $^ $(LDLIBS) -o $@
+	$(CROSS)-strip $@
+
+install-extras:
+	@mkdir -p $(PKG_BIN)/etc
+	install -m 0600 $(CURRENT_DIR)/cyclops/config/cyclops-eye.conf.example \
+		$(PKG_BIN)/etc/cyclops-eye.conf.example
+
+clean:
+	@rm -rf $(PKG_BIN)
+
+distclean: clean
+
+info:
+	@echo "cyclops_eye: cross=$(CROSS) media=$(MEDIA)"

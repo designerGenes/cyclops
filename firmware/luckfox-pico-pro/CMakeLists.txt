@@ -33,7 +33,7 @@ if(CYCLOPS_EYE_WITH_LUCKFOX_SDK)
     # strict ISO pedantic warnings cannot be errors on the hardware target.
     target_compile_options(cyclops-eye PRIVATE -Wall -Wextra -Werror)
     target_link_directories(cyclops-eye PRIVATE ${LUCKFOX_SDK_ROOT}/usr/lib)
-    target_link_libraries(cyclops-eye PRIVATE cyclops_eye_core pthread rtsp_demo rockit)
+    target_link_libraries(cyclops-eye PRIVATE cyclops_eye_core pthread rtsp_demo rockit rkaiq)
     install(TARGETS cyclops-eye RUNTIME DESTINATION usr/bin)
 else()
     add_executable(cyclops-eye-config-check src/config_check.c)

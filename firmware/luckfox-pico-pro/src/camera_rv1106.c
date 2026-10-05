@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "rtsp_demo.h"
+#include "rk_aiq_user_api2_sysctl.h"
 #include "rk_mpi_mb.h"
 #include "rk_mpi_sys.h"
 #include "rk_mpi_venc.h"
@@ -28,10 +29,51 @@ typedef struct {
 struct eye_camera {
     const eye_config_t *config;
     rtsp_demo_handle rtsp;
+    rk_aiq_sys_ctx_t *aiq_ctx;
     encoder_stream_t primary;
     encoder_stream_t detect;
+    bool aiq_started;
     bool system_initialized;
 };
+
+/* The Rockchip ISP is a separate owner from the VI/VENC MPP pipeline. It
+ * must be initialized with the sensor-specific IQ files before video input
+ * is enabled; without it the camera may enumerate but produce no usable ISP
+ * frames. This follows the vendor RV1106 simple_vi_bind_venc_rtsp example. */
+static int isp_start(eye_camera_t *camera) {
+    rk_aiq_static_info_t info;
+    memset(&info, 0, sizeof(info));
+    if (rk_aiq_uapi2_sysctl_enumStaticMetas(camera->config->camera_id, &info) !=
+        XCAM_RETURN_NO_ERROR || info.sensor_info.sensor_name[0] == '\0') {
+        return -1;
+    }
+    camera->aiq_ctx = rk_aiq_uapi2_sysctl_init(
+        info.sensor_info.sensor_name, camera->config->iq_dir, NULL, NULL);
+    if (camera->aiq_ctx == NULL) return -1;
+    if (rk_aiq_uapi2_sysctl_prepare(camera->aiq_ctx, 0, 0,
+                                    RK_AIQ_WORKING_MODE_NORMAL) !=
+        XCAM_RETURN_NO_ERROR) {
+        rk_aiq_uapi2_sysctl_deinit(camera->aiq_ctx);
+        camera->aiq_ctx = NULL;
+        return -1;
+    }
+    if (rk_aiq_uapi2_sysctl_start(camera->aiq_ctx) != XCAM_RETURN_NO_ERROR) {
+        rk_aiq_uapi2_sysctl_deinit(camera->aiq_ctx);
+        camera->aiq_ctx = NULL;
+        return -1;
+    }
+    camera->aiq_started = true;
+    return 0;
+}
+
+static void isp_stop(eye_camera_t *camera) {
+    if (camera->aiq_ctx == NULL) return;
+    if (camera->aiq_started)
+        (void)rk_aiq_uapi2_sysctl_stop(camera->aiq_ctx, false);
+    rk_aiq_uapi2_sysctl_deinit(camera->aiq_ctx);
+    camera->aiq_ctx = NULL;
+    camera->aiq_started = false;
+}
 
 static int vi_device_start(void) {
     VI_DEV_ATTR_S device_attr;
@@ -154,7 +196,8 @@ int eye_camera_start(eye_camera_t **out_camera, const eye_config_t *config, cons
     eye_camera_t *camera = calloc(1, sizeof(*camera));
     if (camera == NULL) return -1;
     camera->config = config;
-    if (RK_MPI_SYS_Init() != RK_SUCCESS || vi_device_start() != 0) goto failed;
+    if (isp_start(camera) != 0 || RK_MPI_SYS_Init() != RK_SUCCESS ||
+        vi_device_start() != 0) goto failed;
     camera->system_initialized = true;
     camera->rtsp = create_rtsp_demo(config->rtsp_port);
     if (camera->rtsp == NULL || camera_start_streams(camera, tier, primary_fps) != 0) goto failed;
@@ -188,5 +231,6 @@ void eye_camera_stop(eye_camera_t *camera) {
         (void)RK_MPI_VI_DisableDev(0);
         (void)RK_MPI_SYS_Exit();
     }
+    isp_stop(camera);
     free(camera);
 }

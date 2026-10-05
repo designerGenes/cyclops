@@ -130,6 +130,10 @@ int main(int argc, char **argv) {
         }
         if (now >= next_heartbeat) {
             double temperature = temperature_celsius();
+            /* Re-discover the LAN address every heartbeat: the wired interface
+             * may only get its DHCP lease after this daemon starts, and the
+             * coordinator needs the current LAN route to pull our RTSP. */
+            discover_lan_ip(config.advertise_host, sizeof(config.advertise_host));
             int status = registered ? post_heartbeat(&config, &governor, temperature, (unsigned long)(now - started))
                                     : post_registration(&config);
             if (status == 0) {
