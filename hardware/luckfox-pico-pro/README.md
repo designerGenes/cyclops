@@ -106,6 +106,15 @@ previews. The STL verifier checks every part for zero non-manifold edges and
 degenerate faces; it also ray-casts the optical window, thermal port, and RJ45
 openings to catch failed booleans.
 
+## Printing the first article
+
+`out/stl/` holds the six current exportable parts. `print-submission/` is a
+ready-to-send bundle of one enclosure set (base, cover, hood and the two seals)
+for the the print service 3D printing service — see
+`print-submission/README.md` for part list, material caveats and cost. That
+service prints ABS only, so the two seals are included for fit-checking only;
+the aluminum thermal insert and the obsolete `chimney`/`nose` parts are omitted.
+
 ## Manufacturing / validation notes
 
 * Use PETG or ASA for the shell and hood; use TPU for both seals. The thermal
