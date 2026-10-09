@@ -89,6 +89,8 @@ int main(int argc, char **argv) {
     double next_thermal;
     double next_heartbeat;
     bool registered = false;
+    int applied_tier = EYE_TIER_FULL;
+    int applied_fps = -1;
 
     if (eye_config_load(config_path, &config, error, sizeof(error)) != 0) {
         (void)fprintf(stderr, "configuration error: %s\n", error);
@@ -111,20 +113,36 @@ int main(int argc, char **argv) {
     started = last_contact = monotonic_seconds();
     next_thermal = started;
     next_heartbeat = started;
+    /* Remember the tier/fps actually applied so a redundant control command or
+     * a no-op governor step does not tear down and rebuild the MPP pipeline.
+     * Every teardown is a chance for the RK ISP/VENC driver to wedge. */
+    applied_tier = eye_governor_effective_tier(&governor);
+    applied_fps = eye_governor_effective_fps(&governor);
     while (keep_running) {
         double now = monotonic_seconds();
         if (eye_control_server_poll(&control, &governor, eye_camera_ready(camera)) > 0) {
-            const eye_tier_t *tier = eye_tier(eye_governor_effective_tier(&governor));
-            if (eye_camera_apply_tier(camera, tier, eye_governor_effective_fps(&governor)) != 0)
-                (void)fprintf(stderr, "camera control reconfiguration failed\n");
+            int want_tier = eye_governor_effective_tier(&governor);
+            int want_fps = eye_governor_effective_fps(&governor);
+            if (want_tier != applied_tier || want_fps != applied_fps) {
+                if (eye_camera_apply_tier(camera, eye_tier(want_tier), want_fps) != 0)
+                    (void)fprintf(stderr, "camera control reconfiguration failed\n");
+                applied_tier = want_tier;
+                applied_fps = want_fps;
+            }
         }
         if (now >= next_thermal) {
             double temperature = temperature_celsius();
             if (temperature >= 0.0 && eye_governor_step(&governor, temperature, false, now)) {
-                const eye_tier_t *tier = eye_tier(eye_governor_effective_tier(&governor));
-                (void)fprintf(stderr, "thermal %.1fC: applying %s tier\n", temperature, tier->name);
-                if (eye_camera_apply_tier(camera, tier, eye_governor_effective_fps(&governor)) != 0)
-                    (void)fprintf(stderr, "camera reconfiguration failed\n");
+                int want_tier = eye_governor_effective_tier(&governor);
+                int want_fps = eye_governor_effective_fps(&governor);
+                if (want_tier != applied_tier || want_fps != applied_fps) {
+                    const eye_tier_t *tier = eye_tier(want_tier);
+                    (void)fprintf(stderr, "thermal %.1fC: applying %s tier\n", temperature, tier->name);
+                    if (eye_camera_apply_tier(camera, tier, want_fps) != 0)
+                        (void)fprintf(stderr, "camera reconfiguration failed\n");
+                    applied_tier = want_tier;
+                    applied_fps = want_fps;
+                }
             }
             next_thermal = now + config.thermal_poll_seconds;
         }
