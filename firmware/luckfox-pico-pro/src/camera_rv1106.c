@@ -227,10 +227,14 @@ void eye_camera_stop(eye_camera_t *camera) {
     if (camera->primary.session != NULL) rtsp_del_session(camera->primary.session);
     if (camera->detect.session != NULL) rtsp_del_session(camera->detect.session);
     if (camera->rtsp != NULL) rtsp_del_demo(camera->rtsp);
+    /* Stop the ISP/AIQ while the MPP media system is still up. Tearing
+     * RK_MPI_SYS down first leaves rk_aiq holding dangling media buffers, and
+     * rk_aiq_uapi2_sysctl_stop() then dereferences NULL -- the librkaiq
+     * SIGSEGV seen in the core-*-cyclops-eye dumps. */
+    isp_stop(camera);
     if (camera->system_initialized) {
         (void)RK_MPI_VI_DisableDev(0);
         (void)RK_MPI_SYS_Exit();
     }
-    isp_stop(camera);
     free(camera);
 }

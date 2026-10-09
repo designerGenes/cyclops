@@ -40,8 +40,30 @@ camera_owner() {
 	[ -z "$cyclops_conf" ] && [ -f /etc/cyclops-eye.conf ] && cyclops_conf=/etc/cyclops-eye.conf
 
 	if [ -x /oem/usr/bin/cyclops-eye ] && [ -n "$cyclops_conf" ]; then
-		echo "starting cyclops-eye ($cyclops_conf)"
-		/oem/usr/bin/cyclops-eye "$cyclops_conf" &
+		# Supervisor: cyclops-eye is a single, long-lived camera owner. It can
+		# die on its own, or leave the ISP/MPP block wedged. Keep it running;
+		# if it exits immediately several times in a row the media pipeline is
+		# almost certainly stuck, so reset the board to recover unattended.
+		fails=0
+		while true; do
+			before=$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)
+			echo "starting cyclops-eye ($cyclops_conf)"
+			/oem/usr/bin/cyclops-eye "$cyclops_conf" >/dev/null 2>&1
+			after=$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)
+			ran=$((after - before))
+			echo "cyclops-eye exited after ${ran}s (quick failures in a row: ${fails})"
+			if [ "$ran" -ge 60 ]; then
+				fails=0
+			else
+				fails=$((fails + 1))
+			fi
+			if [ "$fails" -ge 5 ]; then
+				echo "cyclops-eye keeps failing fast; media pipeline wedged - rebooting"
+				sync
+				reboot
+			fi
+			sleep 5
+		done >/tmp/cyclops-supervisor.log 2>&1 &
 	elif [ -d /oem/usr/share/iqfiles ]; then
 		rkipc -a /oem/usr/share/iqfiles &
 	else
@@ -74,7 +96,9 @@ post_chk() {
 rcS
 
 ulimit -c unlimited
-echo "/data/core-%p-%e" >/proc/sys/kernel/core_pattern
+# Keep core dumps on tmpfs: /data == /userdata is only ~2 MiB and a crash
+# loop fills it (rkipc cores are ~25 MiB). Cores here vanish on reboot.
+echo "/tmp/core-%p-%e" >/proc/sys/kernel/core_pattern
 echo 1 >/proc/sys/vm/overcommit_memory
 
 post_chk &

@@ -28,6 +28,7 @@ cp -a /fw/include/. "$APP/cyclops/include/"
 cp -a /fw/config/. "$APP/cyclops/config/"
 cp /fw/sdk-integration/app-Makefile "$APP/Makefile"
 cp /fw/sdk-integration/RkLunch.sh /sdk/project/app/rkipc/rkipc/src/rv1106_ipc/RkLunch.sh
+cp /fw/sdk-integration/RkLunch-stop.sh /sdk/project/app/rkipc/rkipc/src/rv1106_ipc/RkLunch-stop.sh
 '
 
 echo "[make-image] building app + firmware (incremental; minutes)"
