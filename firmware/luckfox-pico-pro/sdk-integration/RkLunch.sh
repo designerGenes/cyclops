@@ -40,11 +40,12 @@ camera_owner() {
 	[ -z "$cyclops_conf" ] && [ -f /etc/cyclops-eye.conf ] && cyclops_conf=/etc/cyclops-eye.conf
 
 	if [ -x /oem/usr/bin/cyclops-eye ] && [ -n "$cyclops_conf" ]; then
-		# Supervisor: cyclops-eye is a single, long-lived camera owner. It can
-		# die on its own, or leave the ISP/MPP block wedged. Keep it running;
-		# if it exits immediately several times in a row the media pipeline is
-		# almost certainly stuck, so reset the board to recover unattended.
-		fails=0
+		# Local time for the on-video timestamp OSD (the image ships no tzdata).
+		export TZ='CST6CDT,M3.2.0,M11.1.0'
+		# Supervisor: cyclops-eye is a single, long-lived camera owner. Keep it
+		# running. Wedges are handled by the RV1106 hardware watchdog (which the
+		# daemon pets), so we only retry here and never reboot-loop - a missing
+		# or unusable camera just crash-loops the daemon while the board stays up.
 		while true; do
 			before=$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)
 			echo "starting cyclops-eye ($cyclops_conf)"
@@ -52,17 +53,7 @@ camera_owner() {
 			rc=$?
 			after=$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)
 			ran=$((after - before))
-			echo "cyclops-eye exited rc=$rc after ${ran}s (quick failures in a row: ${fails})"
-			if [ "$ran" -ge 60 ]; then
-				fails=0
-			else
-				fails=$((fails + 1))
-			fi
-			if [ "$fails" -ge 5 ]; then
-				echo "cyclops-eye keeps failing fast; media pipeline wedged - rebooting"
-				sync
-				reboot
-			fi
+			echo "cyclops-eye exited rc=$rc after ${ran}s"
 			sleep 5
 		done >/tmp/cyclops-supervisor.log 2>&1 &
 	elif [ -d /oem/usr/share/iqfiles ]; then

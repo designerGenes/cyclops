@@ -235,3 +235,40 @@ Notes / gotchas:
   `cyclops-eye` but leaves less headroom.
 - The board's tailnet hostname is its Cyclops `node_name` (`camera-02`,
   `frasiercrane`, `martincrane`), matching the brain's node registry.
+
+---
+
+## 10. Hardware watchdog & resilience
+
+The eye must recover from a hang by itself. The RV1106 has a DW watchdog, but
+its DT node was disabled and the image exposed no `/dev/watchdog`, so a wedged
+board needed a manual power-cycle. That is now fixed:
+
+- **Kernel** — `make-image.sh` appends `&wdt { status = "okay"; };` to the
+  Pro/Max DTS and sets `CONFIG_WATCHDOG_NOWAYOUT=y` (the DW driver is already
+  built in). It also runs **`./build.sh kernel`** first — **`./build.sh firmware`
+  alone only packages and reuses the old kernel**, so a DTS/config change does
+  not take effect without it.
+- **App** — `cyclops-eye` opens `/dev/watchdog` (30 s timeout) and pets it every
+  5 s from the main loop. With NOWAYOUT armed, if the daemon or the kernel hangs
+  the board resets itself. Verified by `kill -STOP` on the daemon: the board
+  rebooted unaided ~40 s later.
+- **Supervisor (`RkLunch.sh`)** — restarts the daemon on exit but **never
+  reboots** (the watchdog owns that). It also `export TZ='CST6CDT,M3.2.0,M11.1.0'`
+  so the timestamp OSD uses local time without tzdata.
+- **Rootfs overlay** — `make-image.sh` bakes `/etc/TZ` and
+  `/etc/init.d/S98tailscale` into the rootfs (the board's `RK_POST_OVERLAY`
+  includes `overlay-luckfox-config`).
+
+Gotchas we hit:
+
+- **No camera = daemon crash.** A disconnected SC3336 logs
+  `sc3336: Unexpected sensor id(000000)`, then `rk_aiq` init faults inside
+  `librkaiq.so` (`+0x52f08`, `r0=0`) and the daemon exits `rc=139`. **Reseat the
+  CSI ribbon.** The supervisor now retries quietly (no reboot-loop) and the
+  watchdog does not fire (the daemon never opened it).
+- The same `librkaiq + 0x52f08` fault is what tripped the older random wedges.
+- **After a reflash** the node config, `/etc/TZ`, SSH key and Tailscale state are
+  wiped — re-run `provision-eye.sh` then `provision-tailscale.sh` (fresh auth
+  key), and re-approve the node in the Tailscale console (delete the stale
+  entry so the new node keeps the name).

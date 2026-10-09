@@ -57,6 +57,17 @@ echo "  wdt override: $(grep -c "&wdt" "$DTS")"
 echo "  $(grep NOWAYOUT "$DEF")"
 '
 
+echo "[make-image] staging /etc/TZ + S98tailscale into the rootfs overlay"
+docker run --rm --platform linux/amd64 -v "$VOL:/sdk" -v "$FW:/fw:ro" "$IMG" bash -lc '
+set -e
+OV=/sdk/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-config
+mkdir -p "$OV/etc/init.d"
+printf "CST6CDT,M3.2.0,M11.1.0\n" > "$OV/etc/TZ"
+cp /fw/sdk-integration/S98tailscale "$OV/etc/init.d/S98tailscale"
+chmod 755 "$OV/etc/init.d/S98tailscale"
+echo "  staged $OV/etc/TZ and $OV/etc/init.d/S98tailscale"
+'
+
 echo "[make-image] building app + firmware (incremental; minutes)"
 docker run --rm --platform linux/amd64 -v "$VOL:/sdk" "$IMG" bash -lc 'cd /sdk && ./build.sh kernel && ./build.sh app && ./build.sh firmware'
 
