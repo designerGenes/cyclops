@@ -20,7 +20,7 @@
 
 /* 3x5 blocky font, scaled up. 19 chars ("YYYY-MM-DD HH:MM:SS") at 4 cells each
  * (3 glyph columns + 1 space). */
-#define OSD_SCALE 4
+#define OSD_SCALE 6
 #define OSD_CHARS 19
 #define OSD_ADV (4 * OSD_SCALE)
 #define OSD_W (((OSD_CHARS * OSD_ADV) + 15) / 16 * 16) /* align 16 */
@@ -70,7 +70,10 @@ static void render(uint32_t *buf, const char *s) {
             for (int col = 0; col < 3; col++) {
                 if (!((bits >> col) & 1u)) continue;
                 int px0 = x0 + col * OSD_SCALE;
-                int py0 = row * OSD_SCALE;
+                /* The RGN overlay flips the bitmap vertically (confirmed on
+                 * device: text rendered upside down), so draw glyph rows
+                 * bottom-up to compensate. */
+                int py0 = (4 - row) * OSD_SCALE;
                 for (int dy = 0; dy < OSD_SCALE; dy++) {
                     uint32_t *line = buf + (size_t)(py0 + dy) * OSD_W + px0;
                     for (int dx = 0; dx < OSD_SCALE; dx++) line[dx] = 0xFFFFFFFFu;
