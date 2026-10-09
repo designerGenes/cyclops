@@ -31,6 +31,32 @@ cp /fw/sdk-integration/RkLunch.sh /sdk/project/app/rkipc/rkipc/src/rv1106_ipc/Rk
 cp /fw/sdk-integration/RkLunch-stop.sh /sdk/project/app/rkipc/rkipc/src/rv1106_ipc/RkLunch-stop.sh
 '
 
+echo "[make-image] enabling the RV1106 hardware watchdog in the kernel"
+docker run --rm --platform linux/amd64 -v "$VOL:/sdk" "$IMG" bash -lc '
+set -e
+DTS=/sdk/sysdrv/source/kernel/arch/arm/boot/dts/rv1106g-luckfox-pico-pro-max.dts
+if ! grep -q "&wdt" "$DTS"; then
+	printf "\n&wdt {\n\tstatus = \"okay\";\n};\n" >> "$DTS"
+fi
+DEF=/sdk/sysdrv/source/kernel/arch/arm/configs/luckfox_rv1106_linux_defconfig
+if grep -q "CONFIG_WATCHDOG_NOWAYOUT" "$DEF"; then
+	sed -i "s/.*CONFIG_WATCHDOG_NOWAYOUT.*/CONFIG_WATCHDOG_NOWAYOUT=y/" "$DEF"
+else
+	echo "CONFIG_WATCHDOG_NOWAYOUT=y" >> "$DEF"
+fi
+# incremental builds reuse objs_kernel/.config, so patch it too
+CFG=/sdk/sysdrv/source/objs_kernel/.config
+if [ -f "$CFG" ]; then
+	if grep -q "CONFIG_WATCHDOG_NOWAYOUT" "$CFG"; then
+		sed -i "s/.*CONFIG_WATCHDOG_NOWAYOUT.*/CONFIG_WATCHDOG_NOWAYOUT=y/" "$CFG"
+	else
+		echo "CONFIG_WATCHDOG_NOWAYOUT=y" >> "$CFG"
+	fi
+fi
+echo "  wdt override: $(grep -c "&wdt" "$DTS")"
+echo "  $(grep NOWAYOUT "$DEF")"
+'
+
 echo "[make-image] building app + firmware (incremental; minutes)"
 docker run --rm --platform linux/amd64 -v "$VOL:/sdk" "$IMG" bash -lc 'cd /sdk && ./build.sh app && ./build.sh firmware'
 

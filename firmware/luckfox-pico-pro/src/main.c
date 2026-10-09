@@ -8,9 +8,12 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
 #include <sys/reboot.h>
 #include <time.h>
 #include <unistd.h>
+#include <linux/watchdog.h>
 
 static volatile sig_atomic_t keep_running = 1;
 
@@ -77,6 +80,22 @@ static int post_heartbeat(const eye_config_t *config, const eye_governor_t *gove
     return 0;
 }
 
+/* Hardware watchdog: enable /dev/watchdog and pet it from the main loop. With
+ * CONFIG_WATCHDOG_NOWAYOUT set the driver stays armed, so if the app or the
+ * system hangs the board resets itself instead of sitting wedged. Returns -1
+ * when there is no watchdog (the app then runs unchanged). */
+static int watchdog_open(void) {
+    int fd = open("/dev/watchdog", O_WRONLY);
+    if (fd < 0) return -1;
+    int timeout = 30; /* seconds */
+    (void)ioctl(fd, WDIOC_SETTIMEOUT, &timeout);
+    return fd;
+}
+
+static void watchdog_pet(int fd) {
+    if (fd >= 0) (void)write(fd, "k", 1);
+}
+
 int main(int argc, char **argv) {
     const char *config_path = argc == 2 ? argv[1] : "/etc/cyclops-eye.conf";
     eye_config_t config;
@@ -118,6 +137,8 @@ int main(int argc, char **argv) {
      * Every teardown is a chance for the RK ISP/VENC driver to wedge. */
     applied_tier = eye_governor_effective_tier(&governor);
     applied_fps = eye_governor_effective_fps(&governor);
+    int watchdog = watchdog_open();
+    double next_watchdog = started;
     while (keep_running) {
         double now = monotonic_seconds();
         if (eye_control_server_poll(&control, &governor, eye_camera_ready(camera)) > 0) {
@@ -166,6 +187,10 @@ int main(int argc, char **argv) {
             sync();
             (void)reboot(RB_AUTOBOOT);
             last_contact = now;
+        }
+        if (now >= next_watchdog) {
+            watchdog_pet(watchdog);
+            next_watchdog = now + 5.0;
         }
         (void)eye_camera_ready(camera);
         (void)usleep(100000);

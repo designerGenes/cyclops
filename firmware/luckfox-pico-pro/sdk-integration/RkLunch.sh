@@ -49,9 +49,10 @@ camera_owner() {
 			before=$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)
 			echo "starting cyclops-eye ($cyclops_conf)"
 			/oem/usr/bin/cyclops-eye "$cyclops_conf" >/dev/null 2>&1
+			rc=$?
 			after=$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)
 			ran=$((after - before))
-			echo "cyclops-eye exited after ${ran}s (quick failures in a row: ${fails})"
+			echo "cyclops-eye exited rc=$rc after ${ran}s (quick failures in a row: ${fails})"
 			if [ "$ran" -ge 60 ]; then
 				fails=0
 			else
