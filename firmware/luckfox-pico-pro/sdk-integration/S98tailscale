@@ -1,0 +1,36 @@
+#!/bin/sh
+# Tailscale on the Luckfox Cyclops eye (RV1106).
+#
+# The Luckfox kernel has no TUN (`# CONFIG_TUN is not set`), so tailscaled runs
+# in userspace-networking mode. tailscaled >= ~1.100 still proxies INBOUND TCP
+# to the node's local listeners, so the brain can pull rtsp://<name>:8554 and
+# SSH works over the tailnet -- no TUN needed.
+#
+# The node identity and "want running" flag persist in
+# /var/lib/tailscale/tailscaled.state, so no auth key is needed after the first
+# `tailscale up`.
+
+case "$1" in
+  start)
+    mkdir -p /var/lib/tailscale /var/run/tailscale /var/log
+    if pidof tailscaled >/dev/null 2>&1; then
+      echo "tailscaled already running"
+      exit 0
+    fi
+    nohup /usr/bin/tailscaled \
+      --tun=userspace-networking \
+      --state=/var/lib/tailscale/tailscaled.state \
+      --socket=/var/run/tailscale/tailscaled.sock \
+      >/var/log/tailscaled.log 2>&1 &
+    ;;
+  stop)
+    killall tailscaled 2>/dev/null
+    ;;
+  restart|reload)
+    "$0" stop; sleep 1; "$0" start
+    ;;
+  *)
+    echo "usage: $0 {start|stop|restart}"
+    exit 1
+    ;;
+esac

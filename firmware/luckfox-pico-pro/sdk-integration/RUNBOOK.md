@@ -194,3 +194,44 @@ ssh admin@cyclops 'curl -s localhost:9997/v3/paths/get/cam_<name>'
 - The board's Ethernet MAC/IP **changes per boot**; don't hard-code the address.
 - Secrets: the enroll token is shared by all eyes; never commit it. `.githooks/`
   has a gitleaks pre-commit guard in the repo.
+
+---
+
+## 9. Tailscale (optional: stable address + remote fallback)
+
+The Luckfox kernel has **no TUN** (`# CONFIG_TUN is not set`), so Tailscale runs
+in `userspace-networking` mode. Tailscale >= ~1.100 still proxies **inbound TCP**
+to the node's local listeners, so the brain can pull `rtsp://<name>:8554` and SSH
+works over the tailnet — **no kernel rebuild needed**.
+
+Onboard a board once, over ADB, from the repo:
+
+```sh
+# Put the auth key in a file (never commit it; gitleaks guards commits):
+install -d -m700 ~/.config/cyclops
+printf '%s' 'tskey-auth-...' > ~/.config/cyclops/tailscale.authkey
+chmod 600 ~/.config/cyclops/tailscale.authkey
+
+firmware/luckfox-pico-pro/sdk-integration/provision-tailscale.sh camera-02
+```
+
+That installs `tailscale`/`tailscaled` into `/usr/bin`, installs
+`/etc/init.d/S98tailscale` (starts `tailscaled` at boot), and joins the tailnet
+as `<node_name>`. The node identity persists in `/var/lib/tailscale`, so the
+auth key is used **only on the first join** — later start/stop needs no key.
+
+- Approve the node at <https://login.tailscale.com/admin/machines> if it is not
+  pre-authorized by the key.
+- Verify from the brain or this Mac: `tailscale ping <name>` and
+  `nc -z "$(tailscale ip -4 <name>)" 8554`.
+- Pin the version with `TS_VERSION=<x.y.z>` (default in the script).
+
+Notes / gotchas:
+
+- The binaries and boot script live on the **rootfs**, so a firmware reflash
+  wipes them — re-run `provision-tailscale.sh` after a reflash. Baking them into
+  the image is a possible follow-up (needs the SDK rootfs overlay path).
+- `tailscaled` costs ~30–60 MB RAM on the 180 MB board. It coexists with
+  `cyclops-eye` but leaves less headroom.
+- The board's tailnet hostname is its Cyclops `node_name` (`camera-02`,
+  `frasiercrane`, `martincrane`), matching the brain's node registry.
