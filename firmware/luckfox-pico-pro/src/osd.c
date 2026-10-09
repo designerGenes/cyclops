@@ -69,11 +69,11 @@ static void render(uint32_t *buf, const char *s) {
             unsigned bits = FONT3X5[gi][row];
             for (int col = 0; col < 3; col++) {
                 if (!((bits >> col) & 1u)) continue;
-                int px0 = x0 + col * OSD_SCALE;
-                /* The RGN overlay flips the bitmap vertically (confirmed on
-                 * device: text rendered upside down), so draw glyph rows
-                 * bottom-up to compensate. */
-                int py0 = (4 - row) * OSD_SCALE;
+                /* Glyph table encodes bit0 as the RIGHTMOST column, so reverse
+                 * the column order here. The RGN overlay draws the bitmap
+                 * as-is (no flip), so rows stay top-down. */
+                int px0 = x0 + (2 - col) * OSD_SCALE;
+                int py0 = row * OSD_SCALE;
                 for (int dy = 0; dy < OSD_SCALE; dy++) {
                     uint32_t *line = buf + (size_t)(py0 + dy) * OSD_W + px0;
                     for (int dx = 0; dx < OSD_SCALE; dx++) line[dx] = 0xFFFFFFFFu;
