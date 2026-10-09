@@ -58,7 +58,7 @@ echo "  $(grep NOWAYOUT "$DEF")"
 '
 
 echo "[make-image] building app + firmware (incremental; minutes)"
-docker run --rm --platform linux/amd64 -v "$VOL:/sdk" "$IMG" bash -lc 'cd /sdk && ./build.sh app && ./build.sh firmware'
+docker run --rm --platform linux/amd64 -v "$VOL:/sdk" "$IMG" bash -lc 'cd /sdk && ./build.sh kernel && ./build.sh app && ./build.sh firmware'
 
 echo "[make-image] extracting image"
 docker run --rm -v "$VOL:/sdk" -v "$OUT:/out" "$IMG" bash -lc 'cp /sdk/output/image/update.img /out/cyclops-update.img'
