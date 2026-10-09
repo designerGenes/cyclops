@@ -1,4 +1,5 @@
 #include "cyclops_eye/camera.h"
+#include "cyclops_eye/osd.h"
 
 #include <pthread.h>
 #include <stdatomic.h>
@@ -34,6 +35,7 @@ struct eye_camera {
     encoder_stream_t detect;
     bool aiq_started;
     bool system_initialized;
+    eye_osd_t *osd;
 };
 
 /* The Rockchip ISP is a separate owner from the VI/VENC MPP pipeline. It
@@ -188,6 +190,8 @@ static int camera_start_streams(eye_camera_t *camera, const eye_tier_t *tier, in
         stream_stop(&camera->primary);
         return -1;
     }
+    /* Burn a timestamp into the primary encoder output (RGN overlay). */
+    camera->osd = eye_osd_start(PRIMARY_CHANNEL, 16, 16);
     return 0;
 }
 
@@ -209,6 +213,8 @@ failed:
 }
 
 int eye_camera_apply_tier(eye_camera_t *camera, const eye_tier_t *tier, int primary_fps) {
+    eye_osd_stop(camera->osd);
+    camera->osd = NULL;
     stream_stop(&camera->primary);
     stream_stop(&camera->detect);
     if (camera->primary.session != NULL) rtsp_del_session(camera->primary.session);
@@ -222,6 +228,8 @@ bool eye_camera_ready(const eye_camera_t *camera) {
 
 void eye_camera_stop(eye_camera_t *camera) {
     if (camera == NULL) return;
+    eye_osd_stop(camera->osd);
+    camera->osd = NULL;
     stream_stop(&camera->primary);
     stream_stop(&camera->detect);
     if (camera->primary.session != NULL) rtsp_del_session(camera->primary.session);
