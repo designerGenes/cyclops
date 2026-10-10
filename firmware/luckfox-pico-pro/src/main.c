@@ -129,6 +129,9 @@ int main(int argc, char **argv) {
 
     signal(SIGINT, stop_handler);
     signal(SIGTERM, stop_handler);
+    /* A disconnected RTSP client must not kill the daemon: a write to a closed
+     * socket would otherwise raise SIGPIPE (exit rc=141). */
+    signal(SIGPIPE, SIG_IGN);
     started = last_contact = monotonic_seconds();
     next_thermal = started;
     next_heartbeat = started;
