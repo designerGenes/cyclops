@@ -177,6 +177,7 @@ ssh admin@cyclops 'curl -s localhost:9997/v3/paths/get/cam_<name>'
 | Daemon exits: `invalid configuration on line N` | a numeric field exceeded the 65535 cap (e.g. `86400`) | use <= 65535 |
 | Node online but `stream_ready=false` | brain proxy uses node name (unresolvable); daemon reported empty `lan_host` | flash update3+ (re-discovers LAN IP each heartbeat), or set a working `advertise_host` |
 | rkipc core dumps in `/userdata/core-*-rkipc` | vendor camera owner crashes in this image | expected; we replace it with `cyclops-eye` via `RkLunch.sh` |
+| Stream "flickers" / brain reports `source no signal`; `/tmp/cyclops-supervisor.log` shows `cyclops-eye exited rc=141 after ~Ns` | the daemon wrote to an RTSP socket a client just closed → `SIGPIPE` killed it (`141 = 128+13`) | fixed in `src/main.c`: `signal(SIGPIPE, SIG_IGN)` |
 
 ---
 
@@ -268,6 +269,13 @@ Gotchas we hit:
   CSI ribbon.** The supervisor now retries quietly (no reboot-loop) and the
   watchdog does not fire (the daemon never opened it).
 - The same `librkaiq + 0x52f08` fault is what tripped the older random wedges.
+- **A "flicker" is not always a reboot.** If `/tmp/cyclops-supervisor.log` shows
+  `cyclops-eye exited rc=141`, the board never reset — the daemon was killed by
+  `SIGPIPE` writing to a closed RTSP client socket, and the supervisor restarted
+  it (so the stream drops and the brain says "source no signal" every ~2 min).
+  `src/main.c` now ignores `SIGPIPE`, so a client disconnect returns `EPIPE`
+  instead of killing the daemon. Distinguish it from a watchdog reset: a real
+  reset shows `up=` in `/proc/uptime` dropping, not just an `rc=` line.
 - **After a reflash** the node config, `/etc/TZ`, SSH key and Tailscale state are
   wiped — re-run `provision-eye.sh` then `provision-tailscale.sh` (fresh auth
   key), and re-approve the node in the Tailscale console (delete the stale
