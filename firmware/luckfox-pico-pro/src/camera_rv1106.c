@@ -14,8 +14,11 @@
 #include "rk_mpi_venc.h"
 #include "rk_mpi_vi.h"
 
+/* The brain's person detector runs on the /detect stream. 640x360 matches the
+ * model's letterboxed input, but 250 kbps was too compressed for reliable
+ * detection at distance; 8 fps also matches the brain's sampling rate. */
 enum { PRIMARY_CHANNEL = 0, DETECT_CHANNEL = 1, DETECT_WIDTH = 640, DETECT_HEIGHT = 360,
-       DETECT_FPS_CAP = 4, DETECT_BITRATE_KBPS = 250 };
+       DETECT_FPS_CAP = 8, DETECT_BITRATE_KBPS = 800 };
 
 typedef struct {
     int vi_channel;

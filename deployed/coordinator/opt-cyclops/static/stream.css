@@ -2,7 +2,7 @@
 :root{
   --bg:#0B0E12; --panel:#131820; --line:#222B36;
   --txt:#C7D0DA; --dim:#76828F;
-  --iris:#E8A33D; --ok:#58B368; --bad:#E5484D; --seen:#3DA3E8;
+  --iris:#E8A33D; --hot:#F07832; --ok:#58B368; --bad:#E5484D; --seen:#3DA3E8;
   --video-brightness:1.0; --video-contrast:1.0; --video-saturation:1.0;
   --mono:ui-monospace,'SF Mono','Cascadia Mono','JetBrains Mono',Menlo,Consolas,monospace;
 }
@@ -15,6 +15,13 @@ button,select{font-family:inherit}
   border-bottom:1px solid var(--line)}
 .mark{display:flex;align-items:center;gap:.6rem}
 .mark h1{font-size:.95rem;letter-spacing:.45em;font-weight:600;margin:0}
+.bar-actions{display:flex;align-items:center;gap:1rem}
+.reload-button{padding:12px 20px;font-size:16px;font-weight:bold;border-radius:8px;
+  background:var(--panel);border:1px solid var(--line);color:var(--txt);cursor:pointer}
+.reload-button:hover{border-color:var(--iris)}
+.view-toggle{padding:12px 16px;font-size:16px;font-weight:bold;border-radius:8px;
+  background:var(--panel);border:1px solid var(--line);color:var(--iris);cursor:pointer}
+.view-toggle:hover{border-color:var(--iris)}
 .sysline{font-size:.72rem;color:var(--dim);text-align:right}
 
 /* the iris — node health rendered as an eye */
@@ -25,17 +32,20 @@ button,select{font-family:inherit}
 .iris.ok{--c:var(--ok)}
 .iris.idle{--c:var(--iris);animation:irispulse 1.2s ease-in-out infinite}
 .iris.error{--c:var(--bad);animation:irispulse 1.2s ease-in-out infinite}
-.iris.warm{--c:var(--iris)} .iris.hot{--c:var(--bad)}
+.iris.warm{--c:var(--iris)} .iris.hot{--c:var(--hot)}
 .iris.nosig{--c:#C457E8;animation:irispulse 1.2s ease-in-out infinite}
 @keyframes irispulse{0%,100%{opacity:1}50%{opacity:.35}}
 .tile.powerwarn .telemetry{color:var(--bad)}
-.iris.offline{--c:var(--dim);animation:blink 1.6s steps(2,start) infinite}
+.iris.offline{--c:var(--bad);animation:blink 1.6s steps(2,start) infinite}
 @keyframes blink{to{opacity:.25}}
-.iris.disconnected{--c:var(--bad)}
+.iris.disconnected,.iris.paused{--c:var(--dim)}
 @media (prefers-reduced-motion:reduce){.iris.offline{animation:none;opacity:.5}.iris.nosig,.iris.idle,.iris.error{animation:none}}
 
 .stack{display:flex;flex-direction:column;gap:1rem;max-width:1100px;
   margin:1rem auto;padding:0 1rem}
+/* grid view: square-ish matrix of tiles instead of one tall column */
+.stack.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));
+  align-items:start;max-width:1800px}
 
 .tile{background:var(--panel);border:1px solid var(--line);border-radius:6px;
   overflow:hidden;outline:none}
@@ -47,6 +57,15 @@ button,select{font-family:inherit}
   border-bottom:1px solid var(--line);font-size:.78rem}
 .drag{cursor:grab;color:var(--dim);user-select:none}
 .cam-name{font-weight:600;letter-spacing:.08em}
+.eye-status,.video-status,.frame-status,.thermal-status{border:1px solid currentColor;border-radius:999px;
+  padding:.08rem .38rem;font-size:.59rem;line-height:1.2;letter-spacing:.04em;white-space:nowrap}
+.eye-status.online,.video-status.live,.frame-status.fresh,.thermal-status.normal{color:var(--ok)}
+.eye-status.offline,.video-status.error,.frame-status.stale,.thermal-status.power{color:var(--bad)}
+.video-status.waiting,.thermal-status.warm{color:var(--iris)}
+.video-status.retry,.thermal-status.hot{color:var(--hot)}
+.video-status.off,.frame-status.unknown,.thermal-status.unknown{color:var(--dim)}
+.frame-status.stale{font-weight:700;background:rgba(229,72,77,.12)}
+.thermal-status.critical{color:var(--bad);font-weight:700}
 .telemetry{margin-left:auto;color:var(--dim);font-size:.72rem;white-space:nowrap}
 
 /* person-detected latch. Lives in the header strip + a 3px line on the
@@ -74,7 +93,10 @@ button,select{font-family:inherit}
 .viewport.zoomed{cursor:grab}
 .viewport.panning{cursor:grabbing}
 .veil{position:absolute;inset:0;display:flex;align-items:center;
-  justify-content:center;background:rgba(11,14,18,.82)}
+  justify-content:center;background:rgba(11,14,18,.82);z-index:4}
+.veil[hidden]{display:none!important}
+.veil.stale{background:rgba(90,15,20,.82)}
+.veil.stale .veil-msg{color:#fff;font-weight:700}
 .veil-msg{font-size:.78rem;color:var(--dim);letter-spacing:.15em}
 
 .tile-ctl{display:flex;align-items:center;gap:.45rem;padding:.45rem .7rem;
@@ -84,6 +106,7 @@ button,select{font-family:inherit}
 .tile-ctl button:hover{border-color:var(--iris)}
 .tile-ctl button:focus-visible{outline:2px solid var(--iris);outline-offset:1px}
 .zoomval{color:var(--dim);min-width:3.2ch;text-align:center}
+.rotval{color:var(--dim);min-width:3ch;text-align:center}
 .b-connect{color:var(--ok)}
 .b-connect.off{color:var(--bad)}
 .b-stream{color:var(--seen)}
@@ -101,5 +124,10 @@ button,select{font-family:inherit}
 
 @media (max-width:640px){
   .mark h1{letter-spacing:.3em}
+  .bar-actions{gap:.5rem}
+  .reload-button{padding:.5rem .65rem;font-size:.68rem}
+  .sysline{font-size:.62rem}
   .telemetry{display:none}
+  .tile-head{flex-wrap:wrap}
+  .eye-status,.video-status,.frame-status,.thermal-status{font-size:.55rem;padding:.08rem .3rem}
 }

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CYCLOPS — stream wall</title>
-<link rel="stylesheet" href="/static/stream.css?v=5">
+<link rel="stylesheet" href="/static/stream.css?v=12">
 </head>
 <body>
 <header class="bar">
@@ -12,7 +12,12 @@
     <span class="iris iris-lg" id="sysIris" aria-hidden="true"></span>
     <h1>CYCLOPS</h1>
   </div>
-  <div class="sysline" id="sysline">connecting…</div>
+  <div class="bar-actions">
+    <button class="view-toggle" id="viewToggle" type="button"
+            title="toggle list / grid layout" aria-pressed="false">grid</button>
+    <button class="reload-button" type="button" onclick="location.reload()">↻ Reload</button>
+    <div class="sysline" id="sysline">connecting…</div>
+  </div>
 </header>
 
 <main id="stack" class="stack" aria-label="camera stack"></main>
@@ -28,6 +33,10 @@
       <span class="drag" draggable="true" title="drag to reorder">⠿</span>
       <span class="iris" aria-hidden="true"></span>
       <span class="cam-name"></span>
+      <span class="eye-status"></span>
+      <span class="video-status"></span>
+      <span class="frame-status"></span>
+      <span class="thermal-status"></span>
       <span class="presence" role="status" aria-label="person detected">PERSON</span>
       <span class="telemetry"></span>
     </div>
@@ -44,6 +53,8 @@
       <span class="zoomval">1.0×</span>
       <button class="b-zoom-in" title="zoom in">+</button>
       <button class="b-fit" title="reset zoom">fit</button>
+      <button class="b-rot" title="rotate 90° clockwise">⟳</button>
+      <span class="rotval" title="display rotation">0°</span>
       <label class="tiersel">tier
         <select>
           <option value="auto">auto</option>
@@ -67,6 +78,6 @@
   </article>
 </template>
 
-<script src="/static/stream.js?v=8"></script>
+<script src="/static/stream.js?v=15"></script>
 </body>
 </html>

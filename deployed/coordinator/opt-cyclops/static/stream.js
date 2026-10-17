@@ -15,6 +15,21 @@ const sysIris = document.getElementById('sysIris');
 const tiles = new Map();
 let layout = { order: [], hidden: [] };
 
+/* ---------------- list / grid view ---------------- */
+const viewToggle = document.getElementById('viewToggle');
+const VIEW_KEY = 'cyclops.view';
+let viewMode = localStorage.getItem(VIEW_KEY) === 'grid' ? 'grid' : 'list';
+function applyView() {
+  stack.classList.toggle('grid', viewMode === 'grid');
+  viewToggle.textContent = viewMode === 'grid' ? 'list' : 'grid';
+  viewToggle.setAttribute('aria-pressed', viewMode === 'grid' ? 'true' : 'false');
+}
+viewToggle.addEventListener('click', () => {
+  viewMode = viewMode === 'grid' ? 'list' : 'grid';
+  try { localStorage.setItem(VIEW_KEY, viewMode); } catch { /* private mode */ }
+  applyView();
+});
+
 const WHEP_FAIL_THRESHOLD = 3;
 const STALL_MS = 15000;
 const FIRST_FRAME_TIMEOUT = 20000;
@@ -181,6 +196,7 @@ function makeTile(node) {
     connState: 'idle', downGrace: null, stopWatch: null,
     whepFails: 0, useHlsFallback: false,
     zoom: 1, panX: 0, panY: 0,
+    rotation: ((node.rotation || 0) % 360),
     video: el.querySelector('video'),
     veil: el.querySelector('.veil'),
     veilMsg: el.querySelector('.veil-msg'),
@@ -302,8 +318,13 @@ function makeTile(node) {
     const m = (t.zoom - 1) / (2 * t.zoom);
     t.panX = Math.max(-m, Math.min(m, t.panX));
     t.panY = Math.max(-m, Math.min(m, t.panY));
+    const rot = ((t.rotation % 360) + 360) % 360;
+    const r = t.viewport.getBoundingClientRect();
+    // A 90°/270° turn makes the frame tall; scale it to fit the wide viewport.
+    const fit = (rot === 90 || rot === 270) && r.width ? r.height / r.width : 1;
     t.video.style.transform =
-      `scale(${t.zoom}) translate(${t.panX * 100}%, ${t.panY * 100}%)`;
+      `rotate(${rot}deg) scale(${(t.zoom * fit).toFixed(4)}) ` +
+      `translate(${t.panX * 100}%, ${t.panY * 100}%)`;
     t.zoomval.textContent = `${t.zoom.toFixed(1)}×`;
     t.viewport.classList.toggle('zoomed', t.zoom > 1);
   };
@@ -311,6 +332,24 @@ function makeTile(node) {
   el.querySelector('.b-zoom-in').addEventListener('click', () => setZoom(t.zoom + 0.5));
   el.querySelector('.b-zoom-out').addEventListener('click', () => setZoom(t.zoom - 0.5));
   el.querySelector('.b-fit').addEventListener('click', () => setZoom(1));
+
+  /* display rotation — persisted server-side per node, shared across clients */
+  const bRot = el.querySelector('.b-rot');
+  const rotval = el.querySelector('.rotval');
+  const setRotation = (deg, persist) => {
+    t.rotation = ((Math.round(deg / 90) * 90) % 360 + 360) % 360;
+    rotval.textContent = `${t.rotation}°`;
+    applyZoom();
+    if (persist) {
+      fetch(`/api/nodes/${node.name}/rotation`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rotation: t.rotation }),
+      }).catch(() => { /* telemetry poll reconciles */ });
+    }
+  };
+  t.setRotation = setRotation;
+  bRot.addEventListener('click', () => setRotation(t.rotation + 90, true));
+  rotval.textContent = `${t.rotation}°`;
   t.viewport.addEventListener('dblclick', () => setZoom(t.zoom > 1 ? 1 : 2));
   t.viewport.addEventListener('wheel', (e) => {
     e.preventDefault();
@@ -384,6 +423,9 @@ function makeTile(node) {
 function updateTile(t, node) {
   const prevReady = t.node?.stream_ready;
   t.node = node;
+  if (typeof node.rotation === 'number' && node.rotation !== t.rotation) {
+    t.setRotation(node.rotation, false);   // reflect changes from other clients
+  }
   t.iris.className = `iris ${irisClass(t)}`;
   t.el.classList.toggle('seen', !!node.person && node.online);
   t.el.classList.toggle('powerwarn', !!node.power_warn && node.online);
@@ -478,6 +520,7 @@ async function poll() {
 }
 
 (async function init() {
+  applyView();
   try { layout = await (await fetch('/api/layout')).json(); } catch { /* defaults */ }
   await poll();
   render();
