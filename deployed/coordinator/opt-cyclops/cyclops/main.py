@@ -353,6 +353,24 @@ def restart_proxy(name: str):
     return {"ok": True}
 
 
+@app.get("/api/debug/detect/{name}")
+def debug_detect(name: str):
+    """Run the detector against the latest frame from one eye (diagnostics)."""
+    w = pool.watchers.get(name)
+    if w is None or w.last_frame is None:
+        raise HTTPException(404, "no watcher/frame for that node")
+    boxes = pool.detector.detect(w.last_frame)
+    return {
+        "ok": True,
+        "node": name,
+        "detector": pool.detector.name,
+        "frame_age_s": round(time.time() - w.last_frame_at, 2),
+        "box_count": len(boxes),
+        "boxes": [[int(b[0]), int(b[1]), int(b[2]), int(b[3]),
+                   round(float(b[4]), 3)] for b in boxes],
+    }
+
+
 @app.get("/api/layout")
 def get_layout():
     return registry.get_layout()

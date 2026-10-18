@@ -8,6 +8,12 @@ DATA_DIR = os.environ.get("CYCLOPS_DATA", "/opt/cyclops/data")
 
 
 @dataclass
+class NtfyCfg:
+    url: str = ""          # e.g. https://ntfy.sh/cyclops
+    token: str = ""        # optional access token for a protected topic
+
+
+@dataclass
 class TwilioCfg:
     account_sid: str = ""
     auth_token: str = ""
@@ -53,6 +59,7 @@ class Cfg:
     public_base: str = "http://cyclops:8080"   # used in SMS snapshot links
     mediamtx_api: str = "http://127.0.0.1:9997/v3"
     node_offline_after_s: float = 60.0
+    ntfy: NtfyCfg = field(default_factory=NtfyCfg)
     twilio: TwilioCfg = field(default_factory=TwilioCfg)
     detect: DetectCfg = field(default_factory=DetectCfg)
     watchdog: WatchdogCfg = field(default_factory=WatchdogCfg)
@@ -69,6 +76,9 @@ def load() -> Cfg:
               "mediamtx_api", "node_offline_after_s"):
         if k in raw:
             setattr(cfg, k, raw[k])
+    for k, v in raw.get("ntfy", {}).items():
+        if hasattr(cfg.ntfy, k):
+            setattr(cfg.ntfy, k, v)
     for k, v in raw.get("twilio", {}).items():
         if hasattr(cfg.twilio, k):
             setattr(cfg.twilio, k, v)

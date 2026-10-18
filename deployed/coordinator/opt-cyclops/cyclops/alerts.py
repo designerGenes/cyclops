@@ -32,7 +32,7 @@ class AlertManager:
         body = (f"CYCLOPS: {node.name} running hot — {node.temp_c:.1f}C, "
                 f"tier critical, throttled={node.throttled}. "
                 f"Check cooling/enclosure.")
-        threading.Thread(target=self._send_sms, args=(body, ""), daemon=True).start()
+        self._notify(body, "")
         print(f"[alert-thermal] {body}", flush=True)
         return True
 
@@ -57,15 +57,33 @@ class AlertManager:
         body = (f"CYCLOPS: {kind} detected on '{node_name}' at "
                 f"{time.strftime('%H:%M:%S')}. "
                 f"{self.cfg.public_base}/alerts/{fname}")
-        threading.Thread(target=self._send_sms, args=(body, fname),
-                         daemon=True).start()
+        self._notify(body, fname)
         print(f"[alert] {body}", flush=True)
         return True
+
+    def _notify(self, body: str, fname: str) -> None:
+        """Fan out to every configured channel; each runs independently."""
+        for target in (self._send_ntfy, self._send_sms):
+            threading.Thread(target=target, args=(body, fname),
+                             daemon=True).start()
+
+    def _send_ntfy(self, body: str, fname: str) -> None:
+        n = self.cfg.ntfy
+        if not n.url:
+            return
+        headers = {"Title": "Cyclops", "Tags": "eyes"}
+        if n.token:
+            headers["Authorization"] = f"Bearer {n.token}"
+        try:
+            r = requests.post(n.url.rstrip("/"), data=body.encode(),
+                              headers=headers, timeout=10)
+            r.raise_for_status()
+        except Exception as e:
+            print(f"[alert] ntfy send failed: {e}", flush=True)
 
     def _send_sms(self, body: str, fname: str) -> None:
         t = self.cfg.twilio
         if not (t.account_sid and t.auth_token and t.from_number and t.to_number):
-            print("[alert] Twilio not configured; snapshot saved only.", flush=True)
             return
         data = {"To": t.to_number, "From": t.from_number, "Body": body}
         # MMS only works if Twilio's servers can fetch the media — that

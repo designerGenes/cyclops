@@ -33,6 +33,7 @@ class Watcher(threading.Thread):
         self.stop_flag = threading.Event()
         self.hits = 0
         self.hit_times: deque[float] = deque()   # sliding-window hits
+        self.last_frame = None                    # latest decoded frame (debug)
         self.last_frame_at = 0.0
         self.last_person_at = 0.0          # UI presence latch (debounced)
         # ISP-wedge watchdog state
@@ -131,6 +132,7 @@ class Watcher(threading.Thread):
         except Exception as e:
             print(f"[watch:{self.node.name}] inference error: {e}", flush=True)
             return
+        self.last_frame = frame
         cfg = self.pool.cfg.detect
         now = time.time()
         if boxes:
