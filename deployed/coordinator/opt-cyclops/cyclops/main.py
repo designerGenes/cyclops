@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 import requests as _rq
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -354,21 +354,43 @@ def restart_proxy(name: str):
 
 
 @app.get("/api/debug/detect/{name}")
-def debug_detect(name: str):
+def debug_detect(name: str, threshold: float | None = None):
     """Run the detector against the latest frame from one eye (diagnostics)."""
     w = pool.watchers.get(name)
     if w is None or w.last_frame is None:
         raise HTTPException(404, "no watcher/frame for that node")
-    boxes = pool.detector.detect(w.last_frame)
+    detector = pool.detector
+    saved = getattr(detector, "score_threshold", None)
+    if threshold is not None and saved is not None:
+        detector.score_threshold = threshold
+    try:
+        boxes = detector.detect(w.last_frame)
+    finally:
+        if saved is not None:
+            detector.score_threshold = saved
     return {
         "ok": True,
         "node": name,
-        "detector": pool.detector.name,
+        "detector": detector.name,
+        "threshold": threshold,
         "frame_age_s": round(time.time() - w.last_frame_at, 2),
         "box_count": len(boxes),
         "boxes": [[int(b[0]), int(b[1]), int(b[2]), int(b[3]),
                    round(float(b[4]), 3)] for b in boxes],
     }
+
+
+@app.get("/api/debug/frame/{name}")
+def debug_frame(name: str):
+    """Return the exact frame the detector last analysed (JPEG)."""
+    import cv2
+    w = pool.watchers.get(name)
+    if w is None or w.last_frame is None:
+        raise HTTPException(404, "no watcher/frame for that node")
+    ok, buf = cv2.imencode(".jpg", w.last_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    if not ok:
+        raise HTTPException(500, "encode failed")
+    return Response(content=buf.tobytes(), media_type="image/jpeg")
 
 
 @app.get("/api/layout")

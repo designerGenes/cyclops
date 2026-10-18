@@ -82,14 +82,24 @@ class HailoPersonDetector:
                 self._bindings.output().set_buffer(self._flat_output)
                 self._configured.run([self._bindings], timeout=10000)
                 out = self._bindings.output().get_buffer(True)
-        per_image = out[0] if isinstance(out, (list, np.ndarray)) else out
+        # Model-zoo HEFs return (classes, 5, N): axis 0 of the class block is
+        # [ymin, xmin, ymax, xmax, score] and axis 1 is the detection index.
+        # Some builds include a leading batch dim; handle (classes, N, 5) too.
+        arr = np.asarray(out)
+        if arr.ndim == 4:            # (batch, classes, 5, N)
+            arr = arr[0]
+        if arr.ndim != 3:
+            return []
         try:
-            person_rows = per_image[PERSON_CLASS]
+            person = arr[PERSON_CLASS]
         except (IndexError, KeyError, TypeError):
             return []
+        if person.ndim != 2:
+            return []
+        rows = person if person.shape[-1] == 5 else person.T
         boxes = []
         ih, iw = bgr.shape[:2]
-        for row in np.asarray(person_rows).reshape(-1, 5):
+        for row in rows.reshape(-1, 5):
             ymin, xmin, ymax, xmax, score = (float(v) for v in row)
             if score < self.score_threshold:
                 continue
