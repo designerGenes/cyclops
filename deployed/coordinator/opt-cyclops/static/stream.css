@@ -111,6 +111,8 @@ button,select{font-family:inherit}
 .b-connect.off{color:var(--bad)}
 .b-stream{color:var(--seen)}
 .b-stream.off{color:var(--dim)}
+.b-notify{color:var(--ok)}
+.b-notify.off{color:var(--bad)}
 .tiersel{margin-left:auto;color:var(--dim);display:flex;gap:.35rem;align-items:center}
 .tiersel select{background:var(--bg);color:var(--txt);border:1px solid var(--line);
   border-radius:4px;padding:.15rem .3rem}

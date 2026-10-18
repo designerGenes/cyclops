@@ -206,6 +206,27 @@ function makeTile(node) {
     zoomval: el.querySelector('.zoomval'),
   };
 
+  /* presence-alert mute (persisted per camera) */
+  const bNotify = el.querySelector('.b-notify');
+  const applyNotify = (on) => {
+    t.node.notify = on;
+    bNotify.classList.toggle('off', !on);
+    bNotify.textContent = on ? 'alerts' : 'alerts off';
+    bNotify.title = on ? 'presence alerts on (click to mute)'
+                       : 'presence alerts muted (click to enable)';
+  };
+  bNotify.addEventListener('click', async () => {
+    const want = !(t.node.notify !== false);
+    applyNotify(want);
+    try {
+      await fetch(`/api/nodes/${node.name}/notify`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: want }),
+      });
+    } catch { /* telemetry poll reconciles */ }
+  });
+  applyNotify(node.notify !== false);
+
   const teardown = () => {
     clearTimeout(t.retry);
     clearTimeout(t.downGrace); t.downGrace = null;
@@ -423,6 +444,14 @@ function makeTile(node) {
 function updateTile(t, node) {
   const prevReady = t.node?.stream_ready;
   t.node = node;
+  const notifyOn = node.notify !== false;
+  const bN = t.el.querySelector('.b-notify');
+  if (bN) {
+    bN.classList.toggle('off', !notifyOn);
+    bN.textContent = notifyOn ? 'alerts' : 'alerts off';
+    bN.title = notifyOn ? 'presence alerts on (click to mute)'
+                        : 'presence alerts muted (click to enable)';
+  }
   if (typeof node.rotation === 'number' && node.rotation !== t.rotation) {
     t.setRotation(node.rotation, false);   // reflect changes from other clients
   }

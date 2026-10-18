@@ -210,6 +210,10 @@ class RotationBody(BaseModel):
     rotation: int = 0
 
 
+class NotifyBody(BaseModel):
+    enabled: bool = True
+
+
 def _check_token(token: str) -> None:
     if token != cfg.enroll_token:
         raise HTTPException(403, "bad enroll token")
@@ -273,6 +277,7 @@ def list_nodes():
             "tier": n.tier,
             "uptime_s": n.uptime_s,
             "rotation": n.rotation,
+            "notify": n.notify,
             "online": online,
             "heartbeat_age_s": round(now - n.last_seen, 1),
             "stream_ready": _stream_ready(n.name) if online else False,
@@ -337,6 +342,17 @@ def set_rotation(name: str, body: RotationBody):
     except Exception as e:
         print(f"[rotation] {name}: OSD rotation update failed: {e}", flush=True)
     return {"ok": True, "rotation": node.rotation}
+
+
+@app.post("/api/nodes/{name}/notify")
+def set_notify(name: str, body: NotifyBody):
+    """Mute/unmute presence notifications for one camera (persisted)."""
+    if not SAFE_NAME.match(name) or name not in {n.name for n in registry.all()}:
+        raise HTTPException(404, "unknown node")
+    node = registry.set_notify(name, body.enabled)
+    if node is None:
+        raise HTTPException(404, "unknown node")
+    return {"ok": True, "notify": node.notify}
 
 
 @app.post("/api/nodes/{name}/restart-proxy")

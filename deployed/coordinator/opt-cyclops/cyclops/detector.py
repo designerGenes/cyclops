@@ -154,8 +154,11 @@ class Watcher(threading.Thread):
         # ui_hold_s after they leave. Kept separate from maybe_alert so the
         # tile still lights up during the (much longer) SMS cooldown.
         self.last_person_at = now
-        self.pool.alerts.maybe_alert(
-            self.node.name, frame, boxes, self.pool.detector.name)
+        # Presence still shows on the tile/log; only the phone notification is
+        # suppressed when the user has muted this camera.
+        if self.node.notify:
+            self.pool.alerts.maybe_alert(
+                self.node.name, frame, boxes, self.pool.detector.name)
 
     def _log_detection(self, boxes, now: float) -> None:
         try:

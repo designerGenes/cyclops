@@ -23,6 +23,8 @@ class Node:
     throttled: str = "0x0"
     tier: str = "full"
     uptime_s: int = 0
+    rotation: int = 0             # display rotation in degrees: 0/90/180/270
+    notify: bool = True           # send presence alerts for this camera
 
     # RTSP endpoints prefer the LAN route (no per-packet WireGuard crypto
     # on the thermally-limited eye); the tailnet route is the fallback.
@@ -99,6 +101,26 @@ class Registry:
             if lan_host and lan_host != n.lan_host:
                 n.lan_host = lan_host
                 self._save()      # persist the LAN route across restarts
+            return n
+
+    def set_rotation(self, name: str, rotation: int) -> Node | None:
+        """Persist a node's display rotation, snapped to 90° increments."""
+        with self.lock:
+            n = self.nodes.get(name)
+            if not n:
+                return None
+            n.rotation = (int(rotation) % 360 // 90) * 90
+            self._save()
+            return n
+
+    def set_notify(self, name: str, enabled: bool) -> Node | None:
+        """Enable/disable presence notifications for one camera."""
+        with self.lock:
+            n = self.nodes.get(name)
+            if not n:
+                return None
+            n.notify = bool(enabled)
+            self._save()
             return n
 
     def all(self) -> list[Node]:
