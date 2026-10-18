@@ -54,9 +54,10 @@ class AlertManager:
                     [cv2.IMWRITE_JPEG_QUALITY, 85])
 
         kind = "Person" if detector_name.startswith("hailo") else "Motion"
+        # The snapshot is delivered as an ntfy attachment; a LAN-only
+        # public_base URL is useless on a phone.
         body = (f"CYCLOPS: {kind} detected on '{node_name}' at "
-                f"{time.strftime('%H:%M:%S')}. "
-                f"{self.cfg.public_base}/alerts/{fname}")
+                f"{time.strftime('%H:%M:%S')}.")
         self._notify(body, fname)
         print(f"[alert] {body}", flush=True)
         return True
@@ -71,12 +72,21 @@ class AlertManager:
         n = self.cfg.ntfy
         if not n.url:
             return
-        headers = {"Title": "Cyclops", "Tags": "eyes"}
+        headers = {"Title": "Cyclops", "Tags": "eyes", "Message": body}
         if n.token:
             headers["Authorization"] = f"Bearer {n.token}"
+        path = os.path.join(ALERT_DIR, fname) if fname else ""
         try:
-            r = requests.post(n.url.rstrip("/"), data=body.encode(),
-                              headers=headers, timeout=10)
+            if path and os.path.isfile(path):
+                # PUT the JPEG so ntfy hosts it and shows it inline. The phone
+                # needs no route to the LAN.
+                headers["Filename"] = fname
+                with open(path, "rb") as f:
+                    r = requests.put(n.url.rstrip("/"), data=f,
+                                     headers=headers, timeout=20)
+            else:
+                r = requests.post(n.url.rstrip("/"), data=body.encode(),
+                                  headers=headers, timeout=10)
             r.raise_for_status()
         except Exception as e:
             print(f"[alert] ntfy send failed: {e}", flush=True)
