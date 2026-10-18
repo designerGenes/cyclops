@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
     double next_watchdog = started;
     while (keep_running) {
         double now = monotonic_seconds();
-        if (eye_control_server_poll(&control, &governor, eye_camera_ready(camera)) > 0) {
+        if (eye_control_server_poll(&control, &governor, camera, eye_camera_ready(camera)) > 0) {
             int want_tier = eye_governor_effective_tier(&governor);
             int want_fps = eye_governor_effective_fps(&governor);
             if (want_tier != applied_tier || want_fps != applied_fps) {

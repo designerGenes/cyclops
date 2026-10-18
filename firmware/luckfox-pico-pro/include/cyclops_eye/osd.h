@@ -7,9 +7,13 @@
 typedef struct eye_osd eye_osd_t;
 
 /* Create a "YYYY-MM-DD HH:MM:SS" overlay attached to a VENC channel and start
- * a thread that refreshes it once per second. Returns NULL on failure (the
- * caller should continue without an OSD). */
-eye_osd_t *eye_osd_start(int venc_channel, int x, int y);
+ * a thread that refreshes it once per second. `rotation` is the display
+ * rotation applied by the viewer (0/90/180/270 clockwise); the text is rendered
+ * counter-rotated and moved to the matching corner so it stays upright and in
+ * the top-left of the *displayed* frame. Returns NULL on failure (the caller
+ * should continue without an OSD). */
+eye_osd_t *eye_osd_start(int venc_channel, int frame_w, int frame_h,
+                         int rotation);
 
 /* Stop the refresh thread, then detach and destroy the overlay. Must be called
  * before the VENC channel it is attached to is destroyed. */

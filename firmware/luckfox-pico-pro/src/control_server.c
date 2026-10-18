@@ -68,7 +68,7 @@ int eye_control_server_start(eye_control_server_t *server, int port, const char 
 }
 
 int eye_control_server_poll(eye_control_server_t *server, eye_governor_t *governor,
-                            bool camera_ready) {
+                            eye_camera_t *camera, bool camera_ready) {
     char request[2048];
     int client;
     ssize_t received;
@@ -108,6 +108,24 @@ int eye_control_server_poll(eye_control_server_t *server, eye_governor_t *govern
                 updated = end != value && *end == '\0' && eye_governor_set_fps(governor, (int)fps);
             }
             send_json(client, updated ? 200 : 400, updated ? "{\"fps\":\"updated\"}" : "{\"error\":\"bad fps\"}");
+        } else {
+            send_json(client, 400, "{\"error\":\"bad request\"}");
+        }
+        close(client);
+        return updated ? 1 : 0;
+    }
+    if (strncmp(request, "POST /rotation ", 15) == 0) {
+        char value[32];
+        bool updated = false;
+        if (!authorized(request, server->token)) {
+            send_json(client, 403, "{\"error\":\"bad token\"}");
+        } else if (body_value(request, "rotation", value, sizeof(value))) {
+            char *end = NULL;
+            long degrees = strtol(value, &end, 10);
+            if (end != value && *end == '\0' && camera != NULL)
+                updated = eye_camera_set_rotation(camera, (int)degrees) == 0;
+            send_json(client, updated ? 200 : 400,
+                      updated ? "{\"rotation\":\"updated\"}" : "{\"error\":\"bad rotation\"}");
         } else {
             send_json(client, 400, "{\"error\":\"bad request\"}");
         }

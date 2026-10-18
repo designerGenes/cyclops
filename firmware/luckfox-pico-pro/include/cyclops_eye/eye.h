@@ -19,6 +19,7 @@ typedef struct {
     int heartbeat_seconds;
     int thermal_poll_seconds;
     int reboot_after_unreachable_seconds;
+    int rotation;   /* display rotation 0/90/180/270; OSD counter-rotates */
 } eye_config_t;
 
 typedef enum {

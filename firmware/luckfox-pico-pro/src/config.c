@@ -36,6 +36,7 @@ void eye_config_defaults(eye_config_t *config) {
     config->heartbeat_seconds = 15;
     config->thermal_poll_seconds = 5;
     config->reboot_after_unreachable_seconds = 600;
+    config->rotation = 0;
     /* Luckfox's official Pro/Max SPI-NAND Buildroot image installs the
      * sensor tuning profiles in its OEM partition. */
     (void)copy_value(config->iq_dir, sizeof(config->iq_dir), "/oem/usr/share/iqfiles");
@@ -90,6 +91,12 @@ int eye_config_load(const char *path, eye_config_t *config, char *error, size_t 
             if (!parse_positive_int(value, &config->thermal_poll_seconds)) goto invalid;
         } else if (strcmp(key, "reboot_after_unreachable_seconds") == 0) {
             if (!parse_positive_int(value, &config->reboot_after_unreachable_seconds)) goto invalid;
+        } else if (strcmp(key, "rotation") == 0) {
+            char *end = NULL;
+            long parsed = strtol(value, &end, 10);
+            if (*value == '\0' || *end != '\0' ||
+                (parsed != 0 && parsed != 90 && parsed != 180 && parsed != 270)) goto invalid;
+            config->rotation = (int)parsed;
         } else {
             goto invalid;
         }

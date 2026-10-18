@@ -95,7 +95,9 @@ async def lifespan(app: FastAPI):
 # Proxies prefer the node's LAN address (no WireGuard crypto per frame on
 # the thermally-limited eye). If the LAN route breaks, fall back to the
 # tailnet route after 3 consecutive failed readiness checks (90 s); while on
-# the tailnet route, retry the LAN route at most every 10 minutes.
+# the tailnet route, retry the LAN route at most every 10 minutes. MediaMTX
+# paths added through its API are runtime-only, so also recreate a missing
+# proxy after MediaMTX restarts independently of Cyclops.
 _LAN_FAILS_BEFORE_FALLBACK = 3
 _LAN_RETRY_S = 600.0
 _lan_state: dict[str, dict] = {}      # name -> {fails, next_lan_retry}
@@ -112,9 +114,17 @@ def _lan_fallback_loop():
                     st["fails"] = 0
                     continue
                 st["fails"] += 1
+                source = mtx.source_of(node.name)
+                if not source:
+                    print(f"[proxy-recovery] {node.name}: central path missing — recreating {node.primary_rtsp}", flush=True)
+                    mtx.ensure_proxy(node.name, node.primary_rtsp)
+                    with _health_lock:
+                        _health.pop(node.name, None)
+                    st["fails"] = 0
+                    st["next_lan_retry"] = 0.0
+                    continue
                 if st["fails"] < _LAN_FAILS_BEFORE_FALLBACK:
                     continue
-                source = mtx.source_of(node.name)
                 on_lan = bool(node.lan_host) and source == node.primary_rtsp
                 if on_lan:
                     print(f"[lan-fallback] {node.name}: LAN route "
@@ -196,6 +206,10 @@ class FpsBody(BaseModel):
     fps: str = "auto"
 
 
+class RotationBody(BaseModel):
+    rotation: int = 0
+
+
 def _check_token(token: str) -> None:
     if token != cfg.enroll_token:
         raise HTTPException(403, "bad enroll token")
@@ -258,6 +272,7 @@ def list_nodes():
             "throttled": n.throttled,
             "tier": n.tier,
             "uptime_s": n.uptime_s,
+            "rotation": n.rotation,
             "online": online,
             "heartbeat_age_s": round(now - n.last_seen, 1),
             "stream_ready": _stream_ready(n.name) if online else False,
@@ -302,6 +317,26 @@ def set_fps(name: str, body: FpsBody):
     except Exception as e:
         raise HTTPException(502, f"node unreachable: {e}")
     return {"ok": True, "fps": body.fps}
+
+
+@app.post("/api/nodes/{name}/rotation")
+def set_rotation(name: str, body: RotationBody):
+    """Persist a per-node display rotation (0/90/180/270). Display-only:
+    the eyes keep publishing the same RTSP stream; the browser rotates it."""
+    if not SAFE_NAME.match(name) or name not in {n.name for n in registry.all()}:
+        raise HTTPException(404, "unknown node")
+    node = registry.set_rotation(name, body.rotation)
+    if node is None:
+        raise HTTPException(404, "unknown node")
+    # Also tell the eye so its burned-in timestamp counter-rotates to stay
+    # upright in the viewer. Non-fatal: the registry remains the source of truth.
+    try:
+        _rq.post(f"http://{node.host}:8800/rotation",
+                 json={"rotation": str(body.rotation)},
+                 headers={"X-Camnode-Token": cfg.enroll_token}, timeout=5)
+    except Exception as e:
+        print(f"[rotation] {name}: OSD rotation update failed: {e}", flush=True)
+    return {"ok": True, "rotation": node.rotation}
 
 
 @app.post("/api/nodes/{name}/restart-proxy")

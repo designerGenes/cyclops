@@ -39,6 +39,9 @@ struct eye_camera {
     bool aiq_started;
     bool system_initialized;
     eye_osd_t *osd;
+    int rotation;          /* display rotation the OSD counter-rotates for */
+    int frame_w;
+    int frame_h;
 };
 
 /* The Rockchip ISP is a separate owner from the VI/VENC MPP pipeline. It
@@ -193,8 +196,12 @@ static int camera_start_streams(eye_camera_t *camera, const eye_tier_t *tier, in
         stream_stop(&camera->primary);
         return -1;
     }
-    /* Burn a timestamp into the primary encoder output (RGN overlay). */
-    camera->osd = eye_osd_start(PRIMARY_CHANNEL, 16, 16);
+    /* Burn a timestamp into the primary encoder output (RGN overlay),
+     * counter-rotated for the viewer's display rotation. */
+    camera->frame_w = tier->width;
+    camera->frame_h = tier->height;
+    camera->osd = eye_osd_start(PRIMARY_CHANNEL, camera->frame_w, camera->frame_h,
+                                camera->rotation);
     return 0;
 }
 
@@ -203,6 +210,7 @@ int eye_camera_start(eye_camera_t **out_camera, const eye_config_t *config, cons
     eye_camera_t *camera = calloc(1, sizeof(*camera));
     if (camera == NULL) return -1;
     camera->config = config;
+    camera->rotation = config->rotation;
     if (isp_start(camera) != 0 || RK_MPI_SYS_Init() != RK_SUCCESS ||
         vi_device_start() != 0) goto failed;
     camera->system_initialized = true;
@@ -223,6 +231,18 @@ int eye_camera_apply_tier(eye_camera_t *camera, const eye_tier_t *tier, int prim
     if (camera->primary.session != NULL) rtsp_del_session(camera->primary.session);
     if (camera->detect.session != NULL) rtsp_del_session(camera->detect.session);
     return camera_start_streams(camera, tier, primary_fps);
+}
+
+int eye_camera_set_rotation(eye_camera_t *camera, int rotation) {
+    if (camera == NULL) return -1;
+    rotation = ((rotation % 360) + 360) % 360;
+    rotation = (rotation / 90) * 90;
+    if (rotation == camera->rotation && camera->osd != NULL) return 0;
+    camera->rotation = rotation;
+    eye_osd_stop(camera->osd);
+    camera->osd = eye_osd_start(PRIMARY_CHANNEL, camera->frame_w, camera->frame_h,
+                                camera->rotation);
+    return camera->osd != NULL ? 0 : -1;
 }
 
 bool eye_camera_ready(const eye_camera_t *camera) {
