@@ -48,7 +48,7 @@ class DetectCfg:
     hit_window_s: float = 3.0      # sliding window for min_hits
     sample_fps: float = 8.0        # frames/sec pulled per camera
     cooldown_s: float = 120.0      # min seconds between alerts per camera
-    ui_hold_s: float = 60.0        # secs the /stream presence light stays lit
+    ui_hold_s: float = 15.0        # secs the /stream presence light stays lit
 
 
 @dataclass
