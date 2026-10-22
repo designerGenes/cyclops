@@ -27,14 +27,14 @@ class WatchdogCfg:
     # Detects a wedged ISP (frozen AE/AWB -> dark or color-cast picture) from
     # the frames the detector already decodes, and bounces the eye to recover.
     enabled: bool = True
-    cast_ratio: float = 1.5      # mean-channel imbalance (max/min) that = color wedge
-    dark_luma: float = 45.0      # "dark" luma threshold
-    flat_std: float = 10.0       # luma stddev below this = flat/frozen frame
-    good_cast: float = 1.3       # cast <= this AND good_std => clearly healthy
-    good_std: float = 12.0
-    confirm_s: float = 45.0      # must stay bad this long before recovering
-    cooldown_s: float = 900.0    # min seconds between recoveries per node
-    good_window_s: float = 900.0 # only recover a node that was healthy recently
+    cast_ratio: float = 1.30     # mean-channel imbalance (max/min) that = color wedge
+    dark_luma: float = 55.0      # "dark" luma threshold
+    flat_std: float = 8.0        # luma stddev below this = flat/frozen frame
+    good_cast: float = 1.15      # cast <= this AND good_std => clearly healthy
+    good_std: float = 10.0
+    confirm_s: float = 90.0      # must stay bad this long before recovering
+    cooldown_s: float = 1800.0   # min seconds between recoveries per node
+    good_window_s: float = 1800.0 # only recover a node that was healthy recently
     ssh_key: str = "/home/admin/.ssh/cyclops_eye"
     ssh_user: str = "root"
 

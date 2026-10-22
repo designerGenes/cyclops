@@ -105,7 +105,12 @@ class Watcher(threading.Thread):
             self.bad_since = 0.0
             return
 
-        bad = cast >= wd.cast_ratio or (y < wd.dark_luma and s < wd.flat_std)
+        # The wedge we see is dark *and* colour-cast. Requiring both avoids
+        # bouncing on a legitimately warm, bright scene (e.g. sunset); a very
+        # strong cast still trips on its own.
+        bad = (y < wd.dark_luma and
+               (cast >= wd.cast_ratio or s < wd.flat_std)) or \
+              cast >= wd.cast_ratio * 1.5
         if not bad:
             self.bad_since = 0.0
             return
