@@ -36,7 +36,8 @@ class AlertManager:
         print(f"[alert-thermal] {body}", flush=True)
         return True
 
-    def maybe_alert(self, node_name: str, frame, boxes, detector_name: str) -> bool:
+    def maybe_alert(self, node_name: str, frame, boxes, detector_name: str,
+                    rotation: int = 0) -> bool:
         now = time.time()
         with self._lock:
             if now - self._last_alert.get(node_name, 0) < self.cfg.detect.cooldown_s:
@@ -48,6 +49,15 @@ class AlertManager:
             cv2.rectangle(annotated, (x1, y1), (x2, y2), (61, 163, 232), 2)
             cv2.putText(annotated, f"{score:.2f}", (x1, max(0, y1 - 6)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (61, 163, 232), 1)
+        # Save the snapshot the way the viewer sees it (draw boxes first so
+        # they rotate with the image).
+        rotation = (int(rotation) % 360 // 90) * 90
+        if rotation == 90:
+            annotated = cv2.rotate(annotated, cv2.ROTATE_90_CLOCKWISE)
+        elif rotation == 180:
+            annotated = cv2.rotate(annotated, cv2.ROTATE_180)
+        elif rotation == 270:
+            annotated = cv2.rotate(annotated, cv2.ROTATE_90_COUNTERCLOCKWISE)
         stamp = time.strftime("%Y%m%d-%H%M%S")
         fname = f"{stamp}_{node_name}.jpg"
         cv2.imwrite(os.path.join(ALERT_DIR, fname), annotated,

@@ -158,7 +158,8 @@ class Watcher(threading.Thread):
         # suppressed when the user has muted this camera.
         if self.node.notify:
             self.pool.alerts.maybe_alert(
-                self.node.name, frame, boxes, self.pool.detector.name)
+                self.node.name, frame, boxes, self.pool.detector.name,
+                rotation=self.node.rotation)
 
     def _log_detection(self, boxes, now: float) -> None:
         try:
