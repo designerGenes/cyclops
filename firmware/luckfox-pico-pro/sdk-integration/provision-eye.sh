@@ -9,8 +9,26 @@
 set -eu
 
 NAME=${1:?usage: provision-eye.sh <node_name> [brain_url] [token]}
-BRAIN=${2:-http://cyclops.local:8080}
-TOKEN=${3:-}
+HERE=$(CDPATH= cd "$(dirname "$0")" && pwd)
+LOCAL_CONFIG=${CYCLOPS_LOCAL_CONFIG:-$HOME/.config/cyclops/config.toml}
+LOCAL_CONFIG_HELPER="${HERE}/../../../ops/deploy/local_config.py"
+
+# Preserve explicit environment overrides while loading private local defaults.
+ENV_BRAIN=${BRAIN-}
+ENV_BRAIN_SSH=${BRAIN_SSH-}
+ENV_TOKEN=${CYCLOPS_ENROLL_TOKEN-}
+ENV_PUB=${EYE_SSH_PUB-}
+if [ -f "$LOCAL_CONFIG" ]; then
+	eval "$(uv run --project "${HERE}/../../.." python "$LOCAL_CONFIG_HELPER" shell --config "$LOCAL_CONFIG")"
+	NAME=$(uv run --project "${HERE}/../../.." python "$LOCAL_CONFIG_HELPER" name "$NAME" --config "$LOCAL_CONFIG")
+fi
+[ -z "$ENV_BRAIN" ] || BRAIN=$ENV_BRAIN
+[ -z "$ENV_BRAIN_SSH" ] || BRAIN_SSH=$ENV_BRAIN_SSH
+[ -z "$ENV_TOKEN" ] || CYCLOPS_ENROLL_TOKEN=$ENV_TOKEN
+[ -z "$ENV_PUB" ] || EYE_SSH_PUB=$ENV_PUB
+
+BRAIN=${2:-${BRAIN:-http://cyclops.local:8080}}
+TOKEN=${3:-${CYCLOPS_ENROLL_TOKEN:-}}
 BRAIN_SSH=${BRAIN_SSH:-admin@cyclops}
 
 if [ -z "$TOKEN" ]; then

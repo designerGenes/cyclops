@@ -86,7 +86,7 @@ hardware/luckfox-pico-pro/
 ## Open and refine in Blender
 
 ```bash
-blender /Users/admin/DEV/01_active_projects/cyclops/hardware/luckfox-pico-pro/out/luckfox_pico_pro_enclosure.blend
+blender hardware/luckfox-pico-pro/out/luckfox_pico_pro_enclosure.blend
 ```
 
 Collections are `Luckfox_Enclosure`, `Recessed_Optics`, and `Reference_Proxies`.
@@ -96,7 +96,7 @@ toggle their collection to check internal fit. Units are millimetres.
 ## Regenerate and test
 
 ```bash
-cd /Users/admin/DEV/01_active_projects/cyclops
+# from the repository root
 bash hardware/luckfox-pico-pro/generate.sh
 uv run pytest hardware/luckfox-pico-pro/tests
 ```
@@ -110,10 +110,10 @@ openings to catch failed booleans.
 
 `out/stl/` holds the six current exportable parts. `print-submission/` is a
 ready-to-send bundle of one enclosure set (base, cover, hood and the two seals)
-for the the print service 3D printing service — see
-`print-submission/README.md` for part list, material caveats and cost. That
-service prints ABS only, so the two seals are included for fit-checking only;
-the aluminum thermal insert and the obsolete `chimney`/`nose` parts are omitted.
+for fit and manufacturing verification — see `print-submission/README.md` for
+the part list, material caveats and example cost. The two seals are included
+for fit-checking only; the aluminum thermal insert and the obsolete
+`chimney`/`nose` parts are omitted.
 
 ## Manufacturing / validation notes
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="/Users/admin/DEV/01_active_projects/cyclops"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WEB_DIR="${PROJECT_ROOT}/apps/coordinator-web"
 COORD_STATIC_DIR="${PROJECT_ROOT}/apps/coordinator-api/src/cyclops_coordinator/static"
 DIST_ROOT="${PROJECT_ROOT}/dist/releases"

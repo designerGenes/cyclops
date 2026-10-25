@@ -1,10 +1,21 @@
 # Cyclops
 
+```text
+╭───────────────╮
+│ ╭───────────╮ │
+│ │     ◉     │ │
+╵ │           │ ╵
+  │           │
+  │           │
+  ╰─────┬─────╯
+        ╰──────╴ cyclops ╶─
+```
+
 **Many eyes. One watcher.**
 
 Cyclops is a private, self-hosted home camera system built around small edge cameras and a central AI coordinator. It combines low-latency live video, human-presence detection, alert snapshots, and thermal self-management without sending camera footage to a cloud service.
 
-The repository also contains the next-generation **LuckFox Pico Pro/Max eye**, including native RV1106 firmware and a parametric, 3D-printable outdoor enclosure.
+Cyclops cameras run on **LuckFox Pico Pro/Max boards**, using native RV1106 firmware and a custom, parametric 3D-printable outdoor enclosure.
 
 ## Highlights
 
@@ -18,13 +29,13 @@ The repository also contains the next-generation **LuckFox Pico Pro/Max eye**, i
 
 ## Architecture
 
-The deployed system uses Raspberry Pi camera nodes, MediaMTX, and a FastAPI coordinator:
+The current system uses LuckFox camera nodes, MediaMTX, and a FastAPI coordinator:
 
 ```text
 ┌──────────────────── Camera eye ────────────────────┐
-│ Raspberry Pi Zero 2 W + IMX708                     │
+│ LuckFox Pico Pro/Max + SC3336                      │
 │                                                    │
-│ /cam     1536 × 864 H.264 ────────┐                │
+│ /cam     1920 × 1080 H.264 ───────┐                │
 │ /detect   640 × 360 H.264 ─────┐  │                │
 │ Thermal governor + heartbeat   │  │                │
 └────────────────────────────────│──│────────────────┘
@@ -38,24 +49,24 @@ The deployed system uses Raspberry Pi camera nodes, MediaMTX, and a FastAPI coor
                          └───────────────────────────────────┘
 ```
 
-Video is encoded once, in hardware, on each camera. The coordinator does not re-encode the viewing stream; person detection decodes only the lower-resolution detection feed.
+Video is encoded once, in hardware, on each LuckFox camera. The coordinator does not re-encode the viewing stream; person detection decodes only the lower-resolution detection feed.
 
 ## Hardware
 
 | Role | Hardware | Purpose |
 | --- | --- | --- |
-| Current camera eye | Raspberry Pi Zero 2 W + IMX708 | Hardware H.264 video, registration, and thermal control |
+| Current camera eye | LuckFox Pico Pro/Max (RV1106) + SC3336 | Hardware H.264 video, registration, and thermal control |
 | Coordinator | Raspberry Pi 5 + Hailo AI accelerator | Stream routing, person detection, alerts, and dashboard |
-| Next-generation eye | LuckFox Pico Pro/Max (RV1106) + SC3336 | Compact, low-power camera with native dual-stream firmware |
+| Legacy camera eye | Raspberry Pi Zero 2 W + IMX708 | Original implementation, retained for reference |
 | Network | LAN + Tailscale | Private connectivity between cameras, coordinator, and viewers |
 
 ## LuckFox eye and enclosure
 
 <p align="center">
-  <img src="docs/assets/luckfox-boards.jpg" alt="Three LuckFox Pico Pro and Pico Max boards used for the next-generation Cyclops eye" width="720">
+  <img src="docs/assets/luckfox-boards.jpg" alt="Three LuckFox Pico Pro and Pico Max boards used for the current Cyclops eyes" width="720">
 </p>
 
-The LuckFox implementation uses the Rockchip media pipeline directly rather than Raspberry Pi camera abstractions. It publishes the same `/cam` and `/detect` stream contract as the existing eyes, with a 1920×1080 primary feed, a 640×360 detection feed, registration heartbeats, and a thermal governor.
+The LuckFox implementation uses the Rockchip media pipeline directly. It publishes `/cam` and `/detect` RTSP streams, with a 1920×1080 primary feed, a 640×360 detection feed, registration heartbeats, and a thermal governor.
 
 The **v1.1 “fat pill” enclosure** is a parametric, wall-mounted design for the LuckFox board and SC3336 camera. It includes a sliding board sled, camera clamp, rain hood, wall bracket, sheltered louvres, an O-ring cover seal, and an M16 cable gland. All five printed parts are designed to print without supports.
 
@@ -83,9 +94,9 @@ The design is rain-resistant, not submersible, and has not been certified for an
 
 | Path | Contents |
 | --- | --- |
-| `deployed/` | Currently deployed FastAPI, MediaMTX, detector, and camera-node software |
-| `apps/edge-camera/` | Next-generation FastAPI edge camera service |
-| `apps/coordinator-api/` | Next-generation coordinator API and static UI host |
+| `deployed/` | Coordinator software and the legacy Raspberry Pi camera-node implementation |
+| `apps/edge-camera/` | FastAPI edge service from the separate coordinator/edge rewrite |
+| `apps/coordinator-api/` | Coordinator API and static UI host from the separate rewrite |
 | `apps/coordinator-web/` | Responsive React camera dashboard |
 | `packages/contracts/` | Shared TypeScript and JSON Schema contracts |
 | `firmware/luckfox-pico-pro/` | Native RV1106 camera firmware and LuckFox SDK integration |
@@ -93,7 +104,7 @@ The design is rain-resistant, not submersible, and has not been certified for an
 | `config/examples/` | Example edge, coordinator, and camera-registry configuration |
 | `ops/` | Release and deployment scripts |
 
-The `deployed/` tree is the running system's lineage. The `apps/` tree is a separate coordinator/edge rewrite; they should not be treated as interchangeable deployments.
+The `deployed/` tree contains the coordinator's running lineage and the legacy Raspberry Pi eye implementation. Current LuckFox eyes use `firmware/luckfox-pico-pro/`. The `apps/` tree is a separate coordinator/edge rewrite; these paths should not be treated as interchangeable deployments.
 
 ## Local development
 
@@ -113,6 +124,8 @@ pnpm install --frozen-lockfile
 ```
 
 Configuration templates are in [`config/examples/`](config/examples/). Keep real `.env` files, credentials, runtime configuration, and camera state out of Git.
+
+For real device names, addresses, SSH settings, and tokens, create a private `$HOME/.config/cyclops/config.toml` from [`config.example.toml`](config/examples/config.example.toml). The [local configuration guide](docs/operations/local-configuration.md) explains how generic public node IDs resolve to private deployment values.
 
 ### Run the services
 
@@ -136,7 +149,7 @@ In a third terminal, start the web development server:
 pnpm --filter coordinator-web dev
 ```
 
-See [deployment notes](docs/operations/deployment.md) and the [deployed-system guide](deployed/coordinator/opt-cyclops/README.md) for device installation.
+See the [LuckFox provisioning runbook](firmware/luckfox-pico-pro/sdk-integration/RUNBOOK.md) for camera installation and the [coordinator guide](deployed/coordinator/opt-cyclops/README.md) for the central service. [Deployment notes](docs/operations/deployment.md) cover the separate `apps/` rewrite.
 
 ## Verification
 

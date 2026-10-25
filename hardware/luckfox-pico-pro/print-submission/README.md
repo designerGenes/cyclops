@@ -1,58 +1,57 @@
 # 3D Print Submission — LuckFox Pico Pro enclosure (first article)
 
-One (1) full enclosure set for the **LuckFox Pico Pro/Max (RV1106) + SC3336**
-Cyclops camera "eye", submitted to the the print service 3D printing
-service for **fit / manufacturing verification** before we commit to three
-production sets.
+One full enclosure set for the **LuckFox Pico Pro/Max (RV1106) + SC3336**
+Cyclops camera eye, prepared for fit and manufacturing verification before
+printing additional production sets.
 
-* Service: <https://example.invalid/print-service>
-* Format: **STL, millimetres** — matches their requirement.
-* Material requested: **ABS** (their only filament).
-* All parts fit comfortably inside their **229 × 229 × 229 mm** build volume
-  (largest single part here is the canopy at 124 × 64 × 12 mm).
+* Format: **STL, millimetres**.
+* Material requested for the first article: **ABS**.
+* All parts fit within a **229 × 229 × 229 mm** build volume. The largest
+  single part is the canopy at 124 × 64 × 12 mm.
 
 ## Parts in this submission (1 of each)
 
 | File | Part | Bounding box (mm) | Est. ABS mass | Notes |
 |---|---|---|---|---|
-| `luckfox_enclosure_base.stl`      | Base tub        | 110.0 × 58.0 × 9.5   | 17.3 g | Main body, board mounts |
-| `luckfox_enclosure_cover.stl`     | Cover / fascia  | 110.0 × 58.0 × 24.5  | 25.7 g | Recessed optical window, RJ45 side |
-| `luckfox_enclosure_hood.stl`      | Top canopy      | 124.0 × 64.0 × 12.0  | 24.9 g | Weather-shedding hood; needs supports |
-| `luckfox_enclosure_gasket.stl`    | Perimeter gasket| 109.6 × 57.6 × 1.4   | 0.6 g  | **Intended TPU** — ABS for fit-check only |
-| `luckfox_enclosure_thermal_seal.stl` | Thermal seal | 25.0 × 27.0 × 0.8    | 0.2 g  | **Intended TPU** — ABS for fit-check only |
+| `luckfox_enclosure_base.stl` | Base tub | 110.0 × 58.0 × 9.5 | 17.3 g | Main body, board mounts |
+| `luckfox_enclosure_cover.stl` | Cover / fascia | 110.0 × 58.0 × 24.5 | 25.7 g | Recessed optical window, RJ45 side |
+| `luckfox_enclosure_hood.stl` | Top canopy | 124.0 × 64.0 × 12.0 | 24.9 g | Weather-shedding hood; needs supports |
+| `luckfox_enclosure_gasket.stl` | Perimeter gasket | 109.6 × 57.6 × 1.4 | 0.6 g | **Intended TPU** — ABS for fit-check only |
+| `luckfox_enclosure_thermal_seal.stl` | Thermal seal | 25.0 × 27.0 × 0.8 | 0.2 g | **Intended TPU** — ABS for fit-check only |
 
 **Total material ≈ 68.7 g.**
 
-Estimated cost at **$0.15/g incl. supports** → ~**$10.30** material, plus
-supports (the hood and cover have overhangs) → roughly **$11–14**.
-(The $1.50 minimum does not apply.) Supports are included in their pricing.
+At an example rate of **$0.15/g including supports**, the estimated material
+cost is approximately **$10.30**, or **$11–14** after allowing for the hood and
+cover overhangs. Confirm current pricing and support settings with the chosen
+print provider.
 
-## Not included (cannot be made by the print service / not plastic)
+## Not included
 
-* **`thermal_insert`** — designed as a **machined aluminium** part (metal).
-  It is not a 3D print; it will be produced/blanked separately.
-* **`chimney` / `nose`** — **obsolete** parts from the pre-redesign revision
-  and intentionally omitted.
+* **`thermal_insert`** — designed as a **machined aluminium** part, not a
+  plastic print. It will be produced separately.
+* **`chimney` / `nose`** — obsolete parts from the pre-redesign revision and
+  intentionally omitted.
 
 ## Material note
 
-The design was drawn for **PETG/ASA** shells and **TPU** seals. the print service prints
-**ABS only**, which is an acceptable substitute **for this first article**
-(fit, printability and assembly). Caveats:
+The design was drawn for **PETG/ASA** shells and **TPU** seals. ABS is an
+acceptable substitute **for this first article** (fit, printability, and
+assembly), with caveats:
 
-* ABS is more UV/weather-sensitive than ASA and warps more — fine for a
-  bench/fit prototype, not the final outdoor finish.
-* The two seals printed in ABS are **rigid** and will **not** seal; they are
-  included only to check groove/perimeter fit. Functional seals need TPU
-  (print elsewhere) or a silicone / gasket-sheet substitute.
+* ABS is more UV/weather-sensitive than ASA and warps more. It is suitable for
+  a bench/fit prototype, not the final outdoor finish.
+* The two seals printed in ABS are **rigid** and will **not** seal. They are
+  included only to check groove/perimeter fit. Functional seals need TPU or a
+  silicone/gasket-sheet substitute.
 
 ## Print notes for the operator
 
-* Units are millimetres (no scaling required).
+* Units are millimetres; no scaling is required.
 * Single colour is fine; the parts are separate jobs.
-* Suggested orientations: base and cover open-side up; hood as-modelled
+* Suggested orientations: base and cover open-side up; hood as modelled
   (dome up) with supports under the front eaves; seals flat.
-* All five meshes were verified **manifold with 0 degenerate faces**.
+* All five meshes were verified **manifold with zero degenerate faces**.
 
 ## Integrity (SHA-256)
 

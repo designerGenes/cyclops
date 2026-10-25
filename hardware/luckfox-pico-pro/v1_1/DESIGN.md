@@ -20,7 +20,7 @@
 Weatherproof, wall-standoff enclosure for a Luckfox Pico Pro/Max (RV1106, 72 x 21 mm) with an
 SC3336 3MP CSI camera (A or B version). Five printed parts, all STL in millimetres, all
 pre-rotated to their print orientation and sitting on Z=0. No part needs supports. Every part
-fits the the print service's 229 x 229 x 229 mm limit.
+fits a 229 x 229 x 229 mm print-volume limit.
 
 Source of truth: `src/luckfox_pill_enclosure.py` (parametric, manifold3d, `__version__ = "1.1"`).
 Gate: `src/verify_enclosure.py` (must print `RESULT: PASS`).
@@ -149,18 +149,16 @@ M3 machine screws thread directly into the 2.6 mm pilots in PETG or PLA.
 
 ## Printing (library or otherwise)
 
-- **Material:** PETG or ASA strongly preferred. PLA softens around 55 to 60 °C, and a sunny
-  sun-exposed wall can exceed that inside a dark part. If only PLA is offered, use white or light grey
+- **Material:** PETG or ASA strongly preferred. PLA softens around 55 to 60 °C, and a sun-exposed
+  wall can exceed that inside a dark part. If only PLA is offered, use white or light grey
   and accept some creep risk.
 - **Settings:** 0.2 mm layers, at least 4 perimeters, 20 to 25% gyroid infill, 5 top and bottom
   layers, no supports.
 - **Brim:** a 5 mm brim on `pill_body` helps, because the hood stands 62 mm tall.
 - **Sled overhang:** the sled's rail lips are 1.3 mm horizontal ledges. They print fine on
   current printers; if any droop, clean them with a hobby knife.
-- **the print service:** you need a library card. Submit by emailing
-  print@example.invalid with the STL files in millimetres. The size limit is
-  229 x 229 x 229 mm, the charge is $0.15/g including supports with a $1.50 minimum, and you
-  pay in person.
+- **Print service:** confirm the chosen provider's current submission process, build-volume
+  limits, materials, support policy, and pricing before sending the STL files.
 
 ## Assumptions to confirm (each can be fixed with a generator flag, then re-verify)
 
@@ -231,7 +229,7 @@ generator version 1.1
   camera_clamp  >50deg overhang    0.0 mm2, near-horizontal    0.0 mm2
   board_sled    >50deg overhang  185.6 mm2, near-horizontal  185.6 mm2
   wall_bracket  >50deg overhang    0.0 mm2, near-horizontal    0.0 mm2
-== 6. mass / the print service cost ($0.15/g, solid upper bound, PLA 1.24 / PETG 1.27 g/cc)
+== 6. mass / example print cost ($0.15/g, solid upper bound, PLA 1.24 / PETG 1.27 g/cc)
   pill_body      64.1 cm3  <=  81.4 g  <= $12.22
   pill_cover     28.6 cm3  <=  36.3 g  <= $ 5.45
   camera_clamp    0.8 cm3  <=   1.0 g  <= $ 0.15

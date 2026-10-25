@@ -148,7 +148,7 @@ def main():
         flat = (nz < -0.98) & (zmin > 0.25)
         print(f"  {k:13s} >50deg overhang {ar[steep].sum():6.1f} mm2, near-horizontal {ar[flat].sum():6.1f} mm2")
 
-    print("== 6. mass / the print service cost ($0.15/g, solid upper bound, PLA 1.24 / PETG 1.27 g/cc)")
+    print("== 6. mass / example print cost ($0.15/g, solid upper bound, PLA 1.24 / PETG 1.27 g/cc)")
     tot = 0.0
     for k, m in parts.items():
         g = m.volume() / 1000 * 1.27

@@ -5,8 +5,8 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
-    setupFiles: '/Users/admin/DEV/01_active_projects/cyclops/apps/coordinator-web/src/test/setup.ts',
-    include: ['/Users/admin/DEV/01_active_projects/cyclops/apps/coordinator-web/src/test/**/*.test.tsx'],
+    setupFiles: './src/test/setup.ts',
+    include: ['src/test/**/*.test.tsx'],
     globals: true,
   },
   server: {

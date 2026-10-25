@@ -8,7 +8,7 @@ def test_deploy_script_uses_repo_path_for_web_build_check() -> None:
     script = script_path.read_text()
 
     assert '${REPO_PATH}/apps/coordinator-web/package.json' in script
-    assert '/Users/admin/DEV/01_active_projects/cyclops/apps/coordinator-web/package.json' not in script
+    assert '/Users/' not in script
 
 
 def test_edge_deploy_script_links_prefixed_release_directory() -> None:
@@ -23,7 +23,7 @@ def test_edge_deploy_script_resolves_remote_uv_binary() -> None:
     script = script_path.read_text()
 
     assert r'UV_BIN=\$(command -v uv || true)' in script
-    assert '[ -x /home/admin/.local/bin/uv ]' in script
+    assert r'[ -x \$HOME/.local/bin/uv ]' in script
     assert r'\"\${UV_BIN}\" sync --frozen' in script
 
 

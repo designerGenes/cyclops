@@ -1,6 +1,6 @@
 # Cyclops Eye firmware for LuckFox Pico Pro
 
-This is a **new, isolated firmware project** for a LuckFox Pico Pro (RV1106). It does not alter `/Users/admin/DEV/01_active_projects/cyclops/deployed`, connect to an Eye, flash a board, install an init service, or replace the current Raspberry Pi Zero Two W implementation.
+This is the current camera-eye firmware for LuckFox Pico Pro/Max (RV1106) boards. It replaces the earlier Raspberry Pi Zero 2 W implementation and uses the vendor-supported Rockchip media stack directly.
 
 ## Design
 
@@ -20,18 +20,18 @@ The MPP pipeline is based on the public LuckFox SDK `simple_vi_bind_venc_rtsp.c`
 The portable core has no vendor SDK dependency and can be verified locally:
 
 ```bash
-cmake -S /Users/admin/DEV/01_active_projects/cyclops/firmware/luckfox-pico-pro -B /Users/admin/DEV/01_active_projects/cyclops/firmware/luckfox-pico-pro/build
-cmake --build /Users/admin/DEV/01_active_projects/cyclops/firmware/luckfox-pico-pro/build
-ctest --test-dir /Users/admin/DEV/01_active_projects/cyclops/firmware/luckfox-pico-pro/build --output-on-failure
+cmake -S firmware/luckfox-pico-pro -B firmware/luckfox-pico-pro/build
+cmake --build firmware/luckfox-pico-pro/build
+ctest --test-dir firmware/luckfox-pico-pro/build --output-on-failure
 ```
 
 `cyclops-eye-config-check` is the host build's only executable; it validates a configuration file and deliberately cannot access camera hardware.
 
-## Future board integration (not performed)
+## Board integration checklist
 
 1. Start from the exact LuckFox SDK and camera sensor image selected for the boards. Confirm the installed `rk_mpi_*`, `rtsp_demo`, and ISP IQ files match that image.
-2. Cross-compile and stage, but do not deploy, with `/Users/admin/DEV/01_active_projects/cyclops/firmware/luckfox-pico-pro/install.sh --stage-dir /absolute/stage/path --sdk-root /path/to/luckfox/sysroot`.
+2. Cross-compile and stage, but do not deploy, with `firmware/luckfox-pico-pro/install.sh --stage-dir /absolute/stage/path --sdk-root /path/to/luckfox/sysroot`.
 3. On a sacrificial board, verify camera sensor ID, the `iq_dir` files, RTSP-over-TCP, `/cam` and `/detect` decoding, and all thermal tiers before enrolling it in Cyclops.
 4. Only after an explicit rollout decision should the stock `rkipc` camera owner be stopped and the staged SysV file enabled. Never run both camera owners simultaneously.
 
-The example configuration contains no usable credentials. Create one distinct enrollment token per board during that future rollout.
+The example configuration contains no usable credentials. Create one distinct enrollment token per board when provisioning it.

@@ -4,7 +4,7 @@ Everything learned bringing up the first pilot. Follow this to add each new
 board. The whole software flow is reproducible; the slow part is only the
 one-time SDK build.
 
-Node roles: the **brain** is coordinator (`cyclops.local:8080` on the LAN).
+Node roles: the **brain** is the Cyclops coordinator (`cyclops.local:8080` on the LAN).
 Each eye is a Luckfox Pico Pro/Max (RV1106, SC3336 camera). Keep the Pi eyes
 running; give every Luckfox a unique `node_name`.
 

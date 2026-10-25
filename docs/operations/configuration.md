@@ -2,7 +2,7 @@
 
 ## Edge service
 
-Use `/Users/admin/DEV/01_active_projects/cyclops/config/examples/edge.env.example` as the baseline environment file. The edge service persists effective settings to `/var/lib/cyclops-edge/settings.json` by default and supports `CYCLOPS_CAMERA_PROVIDER=mock` for non-Pi development and CI.
+Use `config/examples/edge.env.example` as the baseline environment file. The edge service persists effective settings to `/var/lib/cyclops-edge/settings.json` by default and supports `CYCLOPS_CAMERA_PROVIDER=mock` for development and CI without camera hardware.
 
 Edge endpoint summary:
 
@@ -15,7 +15,7 @@ Edge endpoint summary:
 
 ## Coordinator service
 
-Use `/Users/admin/DEV/01_active_projects/cyclops/config/examples/coordinator.env.example` and a YAML camera registry such as `/Users/admin/DEV/01_active_projects/cyclops/config/examples/cameras.example.yaml`.
+Use `config/examples/coordinator.env.example` and a YAML camera registry such as `config/examples/cameras.example.yaml`.
 
 Coordinator defaults:
 

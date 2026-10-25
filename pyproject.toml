@@ -28,6 +28,6 @@ members = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = [
-  "/Users/admin/DEV/01_active_projects/cyclops/apps/edge-camera/tests",
-  "/Users/admin/DEV/01_active_projects/cyclops/apps/coordinator-api/tests",
+  "apps/edge-camera/tests",
+  "apps/coordinator-api/tests",
 ]

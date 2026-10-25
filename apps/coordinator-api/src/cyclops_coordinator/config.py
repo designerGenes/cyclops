@@ -6,7 +6,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-PROJECT_ROOT = Path("/Users/admin/DEV/01_active_projects/cyclops")
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 
 
 class CoordinatorConfig(BaseSettings):

@@ -1,0 +1,26 @@
+# Copy to $HOME/.config/cyclops/config.toml and replace every placeholder.
+# Keep the private file outside the repository and chmod it to 600.
+
+[coordinator]
+host = "coordinator.local"
+url = "http://cyclops.local:8080"
+ssh_user = "admin"
+ssh_key = "~/.ssh/id_ed25519"
+
+[ssh]
+user = "admin"
+public_key = "~/.ssh/cyclops_eye.pub"
+
+[nodes."camera-01"]
+name = "camera-01"
+host = "camera-01.local"
+# ssh_user = "admin"  # Optional per-node override.
+
+[nodes."camera-02"]
+name = "camera-02"
+host = "camera-02.local"
+# ssh_user = "admin"
+
+[secrets]
+enroll_token = ""
+tailscale_auth_key = ""
