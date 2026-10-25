@@ -9,8 +9,8 @@ from mathutils import Vector
 
 STL_DIR = Path(sys.argv[sys.argv.index("--stl") + 1])
 PARTS = {
-    "base": dict(x=(-55.0, 55.0), y=(-29.0, 29.0), z=(-1.0, 14.0)),
-    "cover": dict(x=(-55.0, 55.0), y=(-29.0, 29.0), z=(9.0, 35.0)),
+    "base": dict(x=(-55.0, 55.0), y=(-30.0, 30.0), z=(-1.0, 14.0)),
+    "cover": dict(x=(-55.0, 55.0), y=(-31.0, 31.0), z=(2.0, 35.0)),
     "hood": dict(x=(-59.0, 65.0), y=(-32.0, 32.0), z=(31.0, 45.0)),
     "gasket": dict(x=(-55.0, 55.0), y=(-29.0, 29.0), z=(8.0, 11.0)),
     "thermal_seal": dict(x=(-10.0, 18.0), y=(-15.0, 15.0), z=(33.0, 35.0)),
@@ -88,12 +88,18 @@ for part, intent in PARTS.items():
         report(not hit, part, "gasketed thermal insert port is open")
         hit, _, _ = ray_hit(scene, depsgraph, (-55.0, 0.0, 17.0), (1, 0, 0), 3.0)
         report(not hit, part, "upper RJ45 port is open")
+        # Snap clips must project past the shell wall below the seam.
+        hit, location, _ = ray_hit(scene, depsgraph, (0.0, 34.0, 6.0), (0, -1, 0), 6.0)
+        report(hit and location.y > 29.0, part, "base/cover snap clip present below the seam")
 
     if part == "base":
         hit, _, _ = ray_hit(scene, depsgraph, (56.0, 0.0, 8.0), (-1, 0, 0), 3.0)
         report(hit, part, "front fascia remains solid below optical window")
         hit, _, _ = ray_hit(scene, depsgraph, (-56.0, 0.0, 7.0), (1, 0, 0), 3.0)
         report(not hit, part, "lower RJ45 port is open")
+        # Catch bumps must sit proud of the long-side wall.
+        hit, location, _ = ray_hit(scene, depsgraph, (0.0, 34.0, 6.4), (0, -1, 0), 6.0)
+        report(hit and location.y > 29.4, part, "base snap catch bump present")
 
     if part == "hood":
         # It is a solid weather canopy; the clearance is under the plate at

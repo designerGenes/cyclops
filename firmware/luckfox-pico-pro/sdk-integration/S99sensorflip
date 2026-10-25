@@ -1,0 +1,31 @@
+#!/bin/sh
+# Cyclops Luckfox eye — keep the SC3336 sensor flipped 180°.
+#
+# Why: the camera module is mounted inverted inside the enclosure, so the raw
+# capture is upside-down. Flipping at the sensor (rather than rotating in the
+# browser) keeps the burned-in timestamp OSD upright and in its top-left corner.
+#
+# rk_aiq resets the sensor's flip registers on every init (boot, and every
+# cyclops-eye restart), so a background loop re-applies the flip whenever it
+# clears. Install to /oem/usr/etc/init.d/S99sensorflip (chmod 755) — /oem is a
+# writable, persistent partition; RkLunch.sh rcS runs /oem/usr/etc/init.d/S??*.
+#
+# Only needed on boards whose module is mounted inverted. Remove/Stop on others.
+PIDFILE=/var/run/sensorflip.pid
+
+apply() {
+  for sd in /dev/v4l-subdev*; do
+    v4l2-ctl -d "$sd" --list-ctrls 2>/dev/null | grep -q vertical_flip || continue
+    v=$(v4l2-ctl -d "$sd" --get-ctrl vertical_flip 2>/dev/null | awk '{print $2}')
+    [ "$v" = "1" ] || v4l2-ctl -d "$sd" -c vertical_flip=1 -c horizontal_flip=1 >/dev/null 2>&1
+  done
+}
+
+case "$1" in
+  start)
+    [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null
+    setsid "$0" loop </dev/null >/dev/null 2>&1 &
+    echo $! > "$PIDFILE" ;;
+  loop) while true; do apply; sleep 2; done ;;
+  stop) [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null; rm -f "$PIDFILE" ;;
+esac

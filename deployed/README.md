@@ -8,7 +8,7 @@ lineage (FastAPI brain + camnode agents + MediaMTX) — it is *not* the newer
 ## Layout
 
 ```
-coordinator/            Pi 5 brain (cyclops, Tailscale "cyclops")
+coordinator/            Pi 5 brain (Tailscale host "cyclops")
   opt-cyclops/           /opt/cyclops snapshot (live software, not venv/data)
   etc-systemd-system/    cyclops.service, mediamtx-central.service
 
@@ -41,18 +41,20 @@ md5s match as of the capture date.
 - One person-detection alert snapshot JPEG under `data/alerts/`
 - MediaMTX and other binaries
 
-## Secrets
+## Secrets and runtime state
 
-The shared enrollment token was **redacted** in these files (originals on the
-machines are untouched):
+The following local files are excluded from Git so credentials, network
+addresses, and live device state are not published:
 
 - `coordinator/opt-cyclops/config.toml`
 - `eyes/camera-01/camnode.toml`
 - `eyes/camera-02/camnode.toml`
+- `coordinator/opt-cyclops/data/registry.json`
+- `coordinator/opt-cyclops/data/layout.json`
 
-All three originally contained `enroll_token = "<REDACTED-SEE-NOTE-IN-README>"`;
-replace from the live machines when reconstructing a deployment. No Tailscale
-auth keys, WiFi passwords, or other credentials are present (scanned).
+Create configuration from the included `*.example` templates when reconstructing
+a deployment. Keep enrollment tokens, Tailscale auth keys, WiFi passwords, and
+other credentials only in local configuration outside version control.
 
 ## Reconstructing
 

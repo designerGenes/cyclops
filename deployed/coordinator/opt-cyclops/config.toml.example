@@ -16,3 +16,20 @@ score_threshold = 0.45
 consecutive_hits = 2
 sample_fps = 4.0
 cooldown_s = 120.0
+
+# Auto-recover an eye whose ISP has wedged: rk_aiq's params stream sometimes
+# times out, freezing AE/AWB -> a dark or colour-cast ("lemonade") picture.
+# Detection rides on the frames the detector already decodes; recovery SSHs to
+# the eye and bounces cyclops-eye, which the on-device supervisor restarts.
+[watchdog]
+enabled = true
+cast_ratio = 1.5      # mean-channel imbalance (max/min) that flags a colour wedge
+dark_luma = 45.0      # "dark" luma threshold
+flat_std = 10.0       # luma stddev below this = flat/frozen frame
+good_cast = 1.3       # <= this AND good_std => clearly healthy
+good_std = 12.0
+confirm_s = 45.0      # must stay bad this long before recovering
+cooldown_s = 900.0    # min seconds between recoveries per node
+good_window_s = 900.0 # only recover a node that was healthy recently
+ssh_key = "/home/admin/.ssh/cyclops_eye"
+ssh_user = "root"

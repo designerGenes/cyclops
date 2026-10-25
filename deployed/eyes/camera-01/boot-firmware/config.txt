@@ -56,14 +56,14 @@ dtoverlay=dwc2,dr_mode=host
 
 [all]
 
-# ---- BEGIN under‑clock block ----
-arm_freq=800        # CPU max → 800 MHz  (stock is 1 GHz)
-arm_freq_min=400    # idle floor to save power/heat
-core_freq=300       # VideoCore “L2” / memory bus
-gpu_freq=300        # OpenGL / H.264 block (stable well below stock 500 MHz)
-over_voltage=-2     # 0.05 V below nominal; fine down to -4, but test first
-force_turbo=0       # keep Dynamic Voltage & Frequency Scaling active
-# ----  END under‑clock block  ----
+# ---- BEGIN under-clock block ----
+arm_freq=800
+arm_freq_min=400
+core_freq=300
+gpu_freq=300
+over_voltage=-2
+force_turbo=0
+# ----  END under-clock block  ----
 
 # Performance tuning settings
 arm_freq=800
@@ -71,7 +71,7 @@ core_freq=250
 sdram_freq=400
 over_voltage=-2
 
-# Thermal throttling soft/hard limits (in °C)
+# Thermal throttling soft/hard limits (in deg C)
 temp_soft_limit=60
 temp_limit=70
 

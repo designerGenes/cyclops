@@ -35,6 +35,9 @@ paths:
     rpiCameraEV: 1
     rpiCameraDenoise: cdn_fast
     rpiCameraBrightness: 0.08
+    # Burn local wall-clock time into camera frames for downstream liveness checks.
+    rpiCameraTextOverlayEnable: true
+    rpiCameraTextOverlay: "%Y-%m-%d %H:%M:%S"
   detect:
     source: rpiCamera
     rpiCameraSecondary: true

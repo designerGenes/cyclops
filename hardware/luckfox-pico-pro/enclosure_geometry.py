@@ -80,6 +80,22 @@ class EnvSpec:
     hood_post_inset_x: float = 8.0
     hood_post_inset_y: float = 6.0
 
+    # Hood snap retention: split-peg cantilever pegs rising from raised cover
+    # bosses into undercut sockets, so the canopy clips on and off.
+    hood_boss_radius: float = 4.5
+    hood_boss_height: float = 4.5
+    hood_socket_entry_radius: float = 2.5
+    hood_socket_cavity_radius: float = 3.4
+    hood_socket_entry_depth: float = 1.0
+    hood_socket_cavity_depth: float = 2.4
+    hood_prong_width: float = 1.3
+    hood_prong_gap: float = 1.0
+    hood_prong_depth: float = 2.4
+    hood_prong_clearance: float = 0.4
+    hood_barb_length: float = 1.1
+    hood_barb_overlap: float = 0.2
+    hood_barb_height: float = 2.0
+
     # External metal thermal insert seated through a gasketed roof port.
     thermal_port_width: float = 20.0
     thermal_port_length: float = 20.0
@@ -100,6 +116,22 @@ class EnvSpec:
     face_channel_y: float = 15.0
     face_channel_width: float = 1.2
     face_channel_depth: float = 1.0
+
+    # Base/cover snap clips. External cantilever tabs on the two long sides
+    # (which carry no ports or drains). Each clip hangs from the cover skirt,
+    # rides over a catch bump on the base wall and snaps under it.
+    snap_clip_count: int = 3
+    snap_clip_spacing: float = 30.0
+    snap_clip_width: float = 9.0
+    snap_clip_thickness: float = 1.2
+    snap_clip_clearance: float = 0.6
+    snap_clip_length: float = 7.0
+    snap_clip_attach: float = 1.5
+    snap_hook_height: float = 1.4
+    snap_hook_depth: float = 0.45
+    snap_catch_height: float = 1.4
+    snap_catch_depth: float = 0.8
+    snap_catch_drop: float = 2.4
 
     # Rear connector.
     rj45_margin: float = 0.9
@@ -140,6 +172,12 @@ class Model:
     hood_top: float = 0.0
     hood_post_x: float = 0.0
     hood_post_y: float = 0.0
+    hood_boss_top: float = 0.0
+    hood_entry_z: float = 0.0
+    hood_floor_z: float = 0.0
+    hood_barb_z0: float = 0.0
+    hood_barb_z1: float = 0.0
+    hood_prong_bottom: float = 0.0
 
     # Thermal geometry.
     thermal_center_z: float = 0.0
@@ -165,6 +203,16 @@ class Model:
     seam_path_width: float = 0.0
     seam_path_radius: float = 0.0
 
+    # Base/cover snap-clip geometry.
+    snap_clip_xs: Tuple[float, ...] = ()
+    snap_clip_y: float = 0.0
+    snap_hook_tip_y: float = 0.0
+    snap_hook_z0: float = 0.0
+    snap_hook_z1: float = 0.0
+    snap_catch_z0: float = 0.0
+    snap_catch_z1: float = 0.0
+    snap_clip_bottom: float = 0.0
+
     def recompute(self) -> "Model":
         e, b, c = self.env, self.board, self.camera
         self.half_x = e.body_length / 2
@@ -189,6 +237,15 @@ class Model:
         self.hood_top = self.hood_bottom + e.hood_thickness
         self.hood_post_x = self.half_x - e.hood_post_inset_x
         self.hood_post_y = self.half_y - e.hood_post_inset_y
+
+        # Hood snap geometry: raised boss with an undercut socket on the cover,
+        # and a split barbed peg on the canopy that snaps into it.
+        self.hood_boss_top = self.cover_top + e.hood_boss_height
+        self.hood_entry_z = self.hood_boss_top - e.hood_socket_entry_depth
+        self.hood_floor_z = self.hood_entry_z - e.hood_socket_cavity_depth
+        self.hood_barb_z1 = self.hood_entry_z
+        self.hood_barb_z0 = self.hood_barb_z1 - e.hood_barb_height
+        self.hood_prong_bottom = self.hood_floor_z + e.hood_prong_clearance
 
         # The thermal flange is sealed against the roof; its fins stay under
         # the canopy with a free gap above for protected ambient convection.
@@ -216,6 +273,19 @@ class Model:
         self.seam_path_length = e.body_length - e.wall
         self.seam_path_width = e.body_width - e.wall
         self.seam_path_radius = e.corner_radius - e.wall / 2
+
+        # Base/cover snap clips along the two long (±Y) sides.
+        count = max(1, e.snap_clip_count)
+        self.snap_clip_xs = tuple(
+            (i - (count - 1) / 2.0) * e.snap_clip_spacing for i in range(count)
+        )
+        self.snap_clip_y = self.half_y + e.snap_clip_clearance + e.snap_clip_thickness / 2
+        self.snap_hook_tip_y = self.half_y + e.snap_clip_clearance - e.snap_hook_depth
+        self.snap_catch_z1 = e.seam_z - e.snap_catch_drop
+        self.snap_catch_z0 = self.snap_catch_z1 - e.snap_catch_height
+        self.snap_hook_z1 = self.snap_catch_z0
+        self.snap_hook_z0 = self.snap_hook_z1 - e.snap_hook_height
+        self.snap_clip_bottom = e.seam_z - e.snap_clip_length
         return self
 
     def validate(self) -> List[Tuple[str, str]]:
@@ -270,6 +340,27 @@ class Model:
         require(e.hood_slope_x < 0,
                 "hood roof must pitch toward the front drip edge")
 
+        # Hood snap joint: boss must clear the canopy, the socket must not
+        # breach the cover roof, and the barb must bite into the undercut.
+        require(self.hood_boss_top < self.hood_bottom - 2.0,
+                "hood snap boss intrudes into the canopy air gap")
+        require(self.hood_floor_z > self.cover_top,
+                "hood snap socket breaches the cover roof")
+        require(e.hood_socket_cavity_radius > e.hood_socket_entry_radius,
+                "hood snap socket has no undercut")
+        require(e.hood_boss_radius > e.hood_socket_cavity_radius,
+                "hood snap boss wall is too thin")
+        prong_half = e.hood_prong_gap / 2 + e.hood_prong_width
+        barb_half = prong_half + e.hood_barb_length
+        require(prong_half < e.hood_socket_entry_radius,
+                "hood snap peg is wider than the socket entry")
+        require(e.hood_socket_entry_radius < barb_half < e.hood_socket_cavity_radius,
+                "hood snap barb does not bite into the socket undercut")
+        require(e.hood_prong_depth / 2 < e.hood_socket_entry_radius,
+                "hood snap peg is too deep for the socket entry")
+        require(self.hood_barb_z0 > self.hood_floor_z,
+                "hood snap barb falls below the socket floor")
+
         require(e.thermal_port_width < e.thermal_flange_width,
                 "thermal insert flange does not overlap its roof port")
         require(e.thermal_port_length < e.thermal_flange_length,
@@ -288,6 +379,27 @@ class Model:
                 "front water channels cross into the rounded corners")
         require(e.gasket_width > 0 and e.gasket_depth > 0,
                 "main housing gasket dimensions must be positive")
+
+        # Snap-clip joints: the hook must bite past the clip face but not pierce
+        # the shell wall, and the catch must not run through the clip.
+        require(0 < e.snap_hook_depth < e.snap_clip_clearance,
+                "snap hook must protrude past the clip inner face without entering the wall")
+        require(e.snap_clip_thickness > 0 and e.snap_clip_clearance > 0,
+                "snap clip needs positive wall thickness and wall clearance")
+        require(e.snap_catch_depth < e.snap_clip_clearance + e.snap_clip_thickness,
+                "base snap catch would run through the clip outer face")
+        require(e.snap_catch_depth > e.snap_clip_clearance - e.snap_hook_depth,
+                "snap catch is too shallow to retain the hook")
+        require(self.snap_clip_bottom < self.snap_hook_z0,
+                "snap hook falls below the clip body")
+        require(e.snap_clip_count >= 1 and e.snap_clip_spacing > e.snap_clip_width,
+                "snap clips would overlap along the wall")
+        if self.snap_clip_xs:
+            reach = max(abs(x) for x in self.snap_clip_xs) + e.snap_clip_width / 2
+            require(reach <= self.half_x - e.corner_radius,
+                    "snap clips reach into the rounded shell corners")
+        require(self.snap_clip_bottom > 1.0,
+                "snap clips hang below the shell base")
 
         require(e.body_length >= b.pcb_length + 2 * e.wall + 20,
                 "body lacks room for front optics and rear connector")
@@ -406,14 +518,73 @@ class Model:
                         (e.thermal_port_length, e.thermal_port_width,
                          e.wall + 4.0))})
 
-        # Four recessed post sockets. They are blind and stay outside the
-        # gasketed electronics cavity.
+        # Raised snap bosses with an undercut socket for the hood pegs; the
+        # socket floor stays above the cover roof so the cavity stays sealed.
         for ix, x in enumerate((-self.hood_post_x, self.hood_post_x)):
             for iy, y in enumerate((-self.hood_post_y, self.hood_post_y)):
+                tag = f"{ix}_{iy}"
+                p.append({"op": "add_cylinder", "part": "cover",
+                          "name": f"Hood_Snap_Boss_{tag}", "axis": "Z",
+                          "material": "cover", "radius": e.hood_boss_radius,
+                          "depth": e.hood_boss_height,
+                          "center": (x, y, self.cover_top + e.hood_boss_height / 2)})
                 p.append({"op": "sub_cylinder", "part": "cover", "target": "Top_Cover",
-                          "name": f"Hood_Post_Socket_{ix}_{iy}", "axis": "Z",
-                          "center": (x, y, e.body_height - 0.45),
-                          "radius": e.hood_post_radius + 0.25, "depth": 1.2})
+                          "name": f"Hood_Socket_Entry_{tag}", "axis": "Z",
+                          "radius": e.hood_socket_entry_radius,
+                          "depth": e.hood_socket_entry_depth + 1.0,
+                          "center": (x, y, self.hood_boss_top + 1.0
+                                     - (e.hood_socket_entry_depth + 1.0) / 2)})
+                p.append({"op": "sub_cylinder", "part": "cover", "target": "Top_Cover",
+                          "name": f"Hood_Socket_Cavity_{tag}", "axis": "Z",
+                          "radius": e.hood_socket_cavity_radius,
+                          "depth": e.hood_socket_cavity_depth,
+                          "center": (x, y, (self.hood_entry_z + self.hood_floor_z) / 2)})
+
+        # ------------------- base/cover snap clips ---------------------------
+        # External cantilever clips on the two long (±Y) sides (no ports or
+        # drains there).  Each clip hangs from the cover above the seam, rides
+        # over a catch bump on the base wall and snaps under it; the joint is
+        # released by flexing the clips outward.
+        for side in (-1, 1):
+            for i, xc in enumerate(self.snap_clip_xs):
+                tag = f"{'p' if side > 0 else 'm'}{i}"
+                y_inner = side * (self.half_y + e.snap_clip_clearance)
+                y_outer = side * (self.half_y + e.snap_clip_clearance
+                                  + e.snap_clip_thickness)
+                y_tip = side * self.snap_hook_tip_y
+                # Connector flange ties the clip to the cover wall above the seam.
+                conn_lo, conn_hi = sorted((side * (self.half_y - 0.75), y_outer))
+                p.append({"op": "add_box", "part": "cover",
+                          "name": f"Snap_Clip_Connector_{tag}",
+                          "center": (xc, (conn_lo + conn_hi) / 2,
+                                     e.seam_z + e.snap_clip_attach / 2),
+                          "size": (e.snap_clip_width, conn_hi - conn_lo,
+                                   e.snap_clip_attach)})
+                # Cantilever body hanging below the seam.
+                p.append({"op": "add_box", "part": "cover",
+                          "name": f"Snap_Clip_{tag}",
+                          "center": (xc, (y_inner + y_outer) / 2,
+                                     (e.seam_z + self.snap_clip_bottom) / 2),
+                          "size": (e.snap_clip_width, abs(y_outer - y_inner),
+                                   e.snap_clip_length)})
+                # Inward hook near the clip foot.
+                hook_lo, hook_hi = sorted((y_inner, y_tip))
+                p.append({"op": "add_box", "part": "cover",
+                          "name": f"Snap_Hook_{tag}",
+                          "center": (xc, (hook_lo + hook_hi) / 2,
+                                     (self.snap_hook_z0 + self.snap_hook_z1) / 2),
+                          "size": (e.snap_clip_width - 2.0, abs(hook_hi - hook_lo),
+                                   e.snap_hook_height)})
+                # Matching catch bump on the base wall (overlaps the wall so it
+                # unions cleanly).
+                catch_lo, catch_hi = sorted((side * (self.half_y - 0.5),
+                                             side * (self.half_y + e.snap_catch_depth)))
+                p.append({"op": "add_box", "part": "base",
+                          "name": f"Snap_Catch_{tag}",
+                          "center": (xc, (catch_lo + catch_hi) / 2,
+                                     (self.snap_catch_z0 + self.snap_catch_z1) / 2),
+                          "size": (e.snap_clip_width, abs(catch_hi - catch_lo),
+                                   e.snap_catch_height)})
 
         # ---------------------------- top canopy -----------------------------
         hood_z0 = self.hood_bottom
@@ -423,14 +594,29 @@ class Model:
                            self.hood_width, e.hood_corner_radius,
                            hood_z0, hood_z1, "cover",
                            slope_x=e.hood_slope_x))
-        # Pilasters terminate just inside the roof and the blind sockets.
+        # Split snap pegs terminate inside the boss sockets and clip the canopy
+        # on; squeeze the barbs together to release.
+        prong_top = hood_z0 + 0.2
+        barb_in = e.hood_prong_gap / 2 + e.hood_prong_width - e.hood_barb_overlap
+        barb_out = e.hood_prong_gap / 2 + e.hood_prong_width + e.hood_barb_length
         for ix, x in enumerate((-self.hood_post_x, self.hood_post_x)):
             for iy, y in enumerate((-self.hood_post_y, self.hood_post_y)):
-                p.append({"op": "add_cylinder", "part": "hood", "reference": False,
-                          "name": f"Canopy_Pillar_{ix}_{iy}", "material": "cover",
-                          "axis": "Z", "center": (x, y, (self.cover_top + hood_z0) / 2),
-                          "radius": e.hood_post_radius,
-                          "depth": hood_z0 - self.cover_top + 0.2})
+                tag = f"{ix}_{iy}"
+                for s in (-1, 1):
+                    side_tag = "p" if s > 0 else "m"
+                    p.append({"op": "add_box", "part": "hood",
+                              "name": f"Hood_Peg_{tag}_{side_tag}",
+                              "center": (x + s * (e.hood_prong_gap / 2
+                                                  + e.hood_prong_width / 2),
+                                         y, (self.hood_prong_bottom + prong_top) / 2),
+                              "size": (e.hood_prong_width, e.hood_prong_depth,
+                                       prong_top - self.hood_prong_bottom)})
+                    p.append({"op": "add_box", "part": "hood",
+                              "name": f"Hood_Barb_{tag}_{side_tag}",
+                              "center": (x + s * (barb_in + barb_out) / 2, y,
+                                         (self.hood_barb_z0 + self.hood_barb_z1) / 2),
+                              "size": (barb_out - barb_in, e.hood_prong_depth,
+                                       e.hood_barb_height)})
 
         # ------------------------- main seam gasket --------------------------
         ring_center_z = e.seam_z - e.gasket_depth / 2

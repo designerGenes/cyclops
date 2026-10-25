@@ -20,10 +20,10 @@ webrtcAdditionalHosts: [cyclops]
 
 hls: yes
 hlsAddress: :8888
-hlsVariant: fmp4
-hlsSegmentDuration: 500ms
-hlsPartDuration: 100ms
-hlsSegmentCount: 3
+hlsVariant: lowLatency
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentCount: 7
 
 rtmp: no
 srt: no

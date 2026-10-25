@@ -1,4 +1,15 @@
+# Local secrets
 .env
+.env.*
+!.env.example
+*.authkey
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+
 .venv/
 .beads/
 .pytest_cache/
@@ -11,7 +22,18 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 *.db
+*.sqlite
 *.sqlite3
+
+# Runtime configuration and device state
+/deployed/coordinator/opt-cyclops/config.toml
+/deployed/coordinator/opt-cyclops/data/
+/deployed/eyes/*/camnode.toml
+
+# Local tooling and OS residue
+.release-tools/
+.DS_Store
+~/
 *.blend1
 apps/coordinator-api/src/cyclops_coordinator/static/assets/
 apps/coordinator-api/src/cyclops_coordinator/static/index.html

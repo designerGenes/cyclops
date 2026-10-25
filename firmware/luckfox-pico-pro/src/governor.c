@@ -2,11 +2,17 @@
 
 #include <string.h>
 
+/* Tier thresholds are set well above the board's normal full-load range
+ * (observed ~62-70 C). A tier change tears down and rebuilds the MPP/VI
+ * pipeline, and RKAIQ's 3A sometimes comes back with a green/dark cast; at
+ * 70 C the governor flapped right at steady-state temperature, which made the
+ * image "fix then go green". Keep headroom so throttling only happens when the
+ * SoC is genuinely hot (RK1106 Tj max is far above this). */
 static const eye_tier_t TIERS[EYE_TIER_COUNT] = {
     {"full", 0.0, 1920, 1080, 15, 2000},
-    {"warm", 70.0, 1280, 720, 12, 1000},
-    {"hot", 78.0, 854, 480, 8, 500},
-    {"critical", 84.0, 640, 360, 5, 250},
+    {"warm", 78.0, 1280, 720, 12, 1000},
+    {"hot", 84.0, 854, 480, 8, 500},
+    {"critical", 90.0, 640, 360, 5, 250},
 };
 
 enum { FPS_BOOST_MAX_TIER = EYE_TIER_WARM };
