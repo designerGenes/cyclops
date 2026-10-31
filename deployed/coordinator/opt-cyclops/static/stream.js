@@ -198,12 +198,93 @@ function makeTile(node) {
     zoom: 1, panX: 0, panY: 0,
     rotation: ((node.rotation || 0) % 360),
     video: el.querySelector('video'),
+    canvas: el.querySelector('canvas'),
+    source: null, raf: null, rotatePipeline: false,
     veil: el.querySelector('.veil'),
     veilMsg: el.querySelector('.veil-msg'),
     viewport: el.querySelector('.viewport'),
     iris: el.querySelector('.iris'),
     telemetry: el.querySelector('.telemetry'),
     zoomval: el.querySelector('.zoomval'),
+  };
+
+  /* Rotation → native Picture-in-Picture. The browser's PiP window plays the
+     raw <video> frames and ignores any CSS transform, so a rotated camera must
+     be pre-rotated before the frames reach the element. When display rotation
+     is non-zero we decode into a hidden source video, draw it rotated through
+     the tile's <canvas>, and let the visible video play canvas.captureStream(). */
+  const enableRotatePipeline = () => {
+    if (t.rotatePipeline) return;
+    t.source = document.createElement('video');
+    t.source.autoplay = true;
+    t.source.muted = true;
+    t.source.playsInline = true;
+    t.source.setAttribute('aria-hidden', 'true');
+    t.source.style.cssText =
+      'position:absolute;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;';
+    t.viewport.appendChild(t.source);
+    if (t.video.srcObject) {
+      t.source.srcObject = t.video.srcObject;
+    } else if (t.video.currentSrc || t.video.getAttribute('src')) {
+      const url = t.video.currentSrc || t.video.getAttribute('src');
+      t.video.removeAttribute('src');
+      t.video.load();
+      t.source.src = url;
+      t.source.load();
+    }
+    t.source.play().catch(() => {});
+    t.video.srcObject = t.canvas.captureStream(30);
+    t.video.muted = true;
+    t.video.play().catch(() => {});
+    t.ctx = t.canvas.getContext('2d');
+    t.rotatePipeline = true;
+    const draw = () => {
+      t.raf = requestAnimationFrame(draw);
+      const s = t.source;
+      if (!s || !s.videoWidth || !s.videoHeight || s.readyState < 2) return;
+      const rot = ((t.rotation % 360) + 360) % 360;
+      const swap = rot === 90 || rot === 270;
+      const cw = swap ? s.videoHeight : s.videoWidth;
+      const ch = swap ? s.videoWidth : s.videoHeight;
+      if (t.canvas.width !== cw || t.canvas.height !== ch) {
+        t.canvas.width = cw;
+        t.canvas.height = ch;
+      }
+      const ctx = t.ctx;
+      ctx.save();
+      ctx.clearRect(0, 0, cw, ch);
+      ctx.translate(cw / 2, ch / 2);
+      ctx.rotate((rot * Math.PI) / 180);
+      ctx.drawImage(s, -s.videoWidth / 2, -s.videoHeight / 2, s.videoWidth, s.videoHeight);
+      ctx.restore();
+    };
+    t.raf = requestAnimationFrame(draw);
+  };
+  const disableRotatePipeline = () => {
+    if (!t.rotatePipeline) return;
+    if (t.raf) { cancelAnimationFrame(t.raf); t.raf = null; }
+    if (t.source) {
+      if (t.source.srcObject) {
+        t.video.srcObject = t.source.srcObject;
+      } else if (t.source.currentSrc || t.source.getAttribute('src')) {
+        const url = t.source.currentSrc || t.source.getAttribute('src');
+        t.video.removeAttribute('src');
+        t.video.load();
+        t.video.src = url;
+        t.video.load();
+      }
+      t.source.removeAttribute('src');
+      t.source.srcObject = null;
+      t.source.load();
+      t.source.remove();
+      t.source = t.video;
+    }
+    t.video.play().catch(() => {});
+    t.rotatePipeline = false;
+  };
+  const applyRotationPipeline = () => {
+    if (((t.rotation % 360) + 360) % 360 !== 0) enableRotatePipeline();
+    else disableRotatePipeline();
   };
 
   /* presence-alert mute (persisted per camera) */
@@ -232,7 +313,13 @@ function makeTile(node) {
     clearTimeout(t.downGrace); t.downGrace = null;
     if (t.stopWatch) { t.stopWatch(); t.stopWatch = null; }
     if (t.pc) { try { t.pc.close(); } catch { /* */ } t.pc = null; }
-    t.video.srcObject = null;
+    if (t.rotatePipeline && t.source && t.source !== t.video) {
+      t.source.srcObject = null;
+      t.source.removeAttribute('src');
+      t.source.load();
+    } else {
+      t.video.srcObject = null;
+    }
     t.connecting = false;
   };
 
@@ -259,9 +346,9 @@ function makeTile(node) {
       const forceHls = transportPref === 'hls' || t.useHlsFallback ||
         (transportPref === 'auto' && isIOS);
       if (forceHls) {
-        t.pc = await hlsConnect(t.video, node.whep_path);
+        t.pc = await hlsConnect(t.source, node.whep_path);
       } else {
-        t.pc = await whepConnect(t.video, node.whep_path);
+        t.pc = await whepConnect(t.source, node.whep_path);
         t.whepFails = 0;
       }
 
@@ -281,9 +368,9 @@ function makeTile(node) {
         });
       }
 
-      await waitForFirstFrame(t.video, FIRST_FRAME_TIMEOUT);
+      await waitForFirstFrame(t.source, FIRST_FRAME_TIMEOUT);
       setConn('live');
-      t.stopWatch = startFrameWatchdog(t.video, STALL_MS, () => reconnect(false));
+      t.stopWatch = startFrameWatchdog(t.source, STALL_MS, () => reconnect(false));
     } catch {
       if (!forceHls) {
         t.whepFails++;
@@ -322,11 +409,13 @@ function makeTile(node) {
     bStream.textContent = t.paused ? 'play' : 'stream';
     bStream.classList.toggle('off', t.paused);
     if (t.paused) {
-      if (t.video) { t.video.pause(); }
+      if (t.source) t.source.pause();
+      if (t.rotatePipeline && t.video) t.video.pause();
       applyState(t);
     } else {
-      if (t.video && t.video.srcObject) {
-        t.video.play().catch(() => {});
+      if (t.source && (t.source.srcObject || t.source.currentSrc || t.source.getAttribute('src'))) {
+        t.source.play().catch(() => {});
+        if (t.rotatePipeline && t.video) t.video.play().catch(() => {});
         applyState(t);
       } else if (t.connected && t.node.stream_ready === true) {
         connect();
@@ -339,13 +428,19 @@ function makeTile(node) {
     const m = (t.zoom - 1) / (2 * t.zoom);
     t.panX = Math.max(-m, Math.min(m, t.panX));
     t.panY = Math.max(-m, Math.min(m, t.panY));
-    const rot = ((t.rotation % 360) + 360) % 360;
-    const r = t.viewport.getBoundingClientRect();
-    // A 90°/270° turn makes the frame tall; scale it to fit the wide viewport.
-    const fit = (rot === 90 || rot === 270) && r.width ? r.height / r.width : 1;
-    t.video.style.transform =
-      `rotate(${rot}deg) scale(${(t.zoom * fit).toFixed(4)}) ` +
-      `translate(${t.panX * 100}%, ${t.panY * 100}%)`;
+    if (t.rotatePipeline) {
+      // Frames are already rotated into the video element; zoom/pan only.
+      t.video.style.transform =
+        `scale(${t.zoom.toFixed(4)}) translate(${t.panX * 100}%, ${t.panY * 100}%)`;
+    } else {
+      const rot = ((t.rotation % 360) + 360) % 360;
+      const r = t.viewport.getBoundingClientRect();
+      // A 90°/270° turn makes the frame tall; scale it to fit the wide viewport.
+      const fit = (rot === 90 || rot === 270) && r.width ? r.height / r.width : 1;
+      t.video.style.transform =
+        `rotate(${rot}deg) scale(${(t.zoom * fit).toFixed(4)}) ` +
+        `translate(${t.panX * 100}%, ${t.panY * 100}%)`;
+    }
     t.zoomval.textContent = `${t.zoom.toFixed(1)}×`;
     t.viewport.classList.toggle('zoomed', t.zoom > 1);
   };
@@ -360,6 +455,7 @@ function makeTile(node) {
   const setRotation = (deg, persist) => {
     t.rotation = ((Math.round(deg / 90) * 90) % 360 + 360) % 360;
     rotval.textContent = `${t.rotation}°`;
+    applyRotationPipeline();
     applyZoom();
     if (persist) {
       fetch(`/api/nodes/${node.name}/rotation`, {
@@ -437,6 +533,8 @@ function makeTile(node) {
     saveLayout(); render();
   });
 
+  t.source = t.video;
+  applyRotationPipeline();
   applyZoom();
   return t;
 }
