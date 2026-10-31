@@ -19,6 +19,11 @@ typedef struct eye_osd eye_osd_t;
 eye_osd_t *eye_osd_start(int venc_channel, int frame_w, int frame_h,
                          int rotation, int scale, int color);
 
+/* Change the timestamp fill color in place (no region teardown); the OSD
+ * thread re-renders on its next wake, so the update is visible within ~100ms.
+ * Call this for color-only changes; use eye_osd_start for scale changes. */
+void eye_osd_set_color(eye_osd_t *osd, int color);
+
 /* Stop the refresh thread, then detach and destroy the overlay. Must be called
  * before the VENC channel it is attached to is destroyed. */
 void eye_osd_stop(eye_osd_t *osd);

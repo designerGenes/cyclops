@@ -278,6 +278,12 @@ int eye_camera_set_osd(eye_camera_t *camera, int scale, int color) {
     if (color < EYE_OSD_WHITE) color = EYE_OSD_WHITE;
     if (color > EYE_OSD_COLOR_MAX) color = EYE_OSD_COLOR_MAX;
     if (scale == camera->osd_scale && color == camera->osd_color && camera->osd != NULL) return 0;
+    if (scale == camera->osd_scale && camera->osd != NULL) {
+        /* Color-only change: update in place, visible on the next frame. */
+        camera->osd_color = color;
+        eye_osd_set_color(camera->osd, color);
+        return 0;
+    }
     camera->osd_scale = scale;
     camera->osd_color = color;
     eye_osd_stop(camera->osd);

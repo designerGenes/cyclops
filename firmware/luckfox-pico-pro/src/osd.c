@@ -34,17 +34,25 @@
 #define OSD_RGN_HANDLE 0
 #define OSD_MARGIN 16
 
+/* The RV1106 rockit RGN overlay reads each ARGB8888 pixel as A(byte0),
+ * R(byte1), G(byte2), B(byte3) in memory - i.e. the 32-bit value is
+ * 0xBBGGRRAA with alpha in the LOW byte. Verified on hardware: packing as
+ * 0xAARRGGBB put alpha in the ignored high byte, so any color whose low byte
+ * was 0x00 vanished and channel order was wrong. OSD_RGB packs correctly. */
+#define OSD_RGB(r, g, b) (((uint32_t)(b) << 24) | ((uint32_t)(g) << 16) | \
+                          ((uint32_t)(r) << 8) | 0xFFu)
+
 /* Fixed high-contrast fills, indexed by the EYE_OSD_* modes in eye.h. Index 1
  * (CYCLE) is a placeholder: the thread picks a hue from the YELLOW..GREEN
  * range and overwrites o->cycle_index each refresh. */
 static const uint32_t OSD_PALETTE[EYE_OSD_COLOR_MAX + 1] = {
-    0xFFFFFFFFu, /* WHITE   */
-    0xFFFFFFFFu, /* CYCLE   (unused directly) */
-    0xFFFFE400u, /* YELLOW  */
-    0xFF00E5FFu, /* CYAN    */
-    0xFFFF00E5u, /* MAGENTA */
-    0xFFFF7E00u, /* ORANGE  */
-    0xFF64FF4Au, /* GREEN   */
+    OSD_RGB(0xFF, 0xFF, 0xFF), /* WHITE   */
+    OSD_RGB(0xFF, 0xFF, 0xFF), /* CYCLE   (unused directly) */
+    OSD_RGB(0xFF, 0xE4, 0x00), /* YELLOW  */
+    OSD_RGB(0x00, 0xE5, 0xFF), /* CYAN    */
+    OSD_RGB(0xFF, 0x00, 0xE5), /* MAGENTA */
+    OSD_RGB(0xFF, 0x7E, 0x00), /* ORANGE  */
+    OSD_RGB(0x64, 0xFF, 0x4A), /* GREEN   */
 };
 
 /* Each row is 3 bits, bit0 = leftmost column. */
@@ -88,6 +96,7 @@ struct eye_osd {
     uint32_t *buf;  /* counter-rotated bitmap attached to the VENC */
     pthread_t thread;
     atomic_bool running;
+    atomic_bool update_pending; /* set by eye_osd_set_color to force a refresh */
     bool started;
 };
 
@@ -125,7 +134,7 @@ static void render_text(eye_osd_t *o, const char *s, uint32_t fill) {
                 int py = row * scale;
                 /* Black outline first (slightly larger), then the colored fill. */
                 paint_block(o, px - OSD_OUTLINE, py - OSD_OUTLINE,
-                            scale + 2 * OSD_OUTLINE, scale + 2 * OSD_OUTLINE, 0xFF000000u);
+                            scale + 2 * OSD_OUTLINE, scale + 2 * OSD_OUTLINE, OSD_RGB(0x00, 0x00, 0x00));
                 paint_block(o, px, py, scale, scale, fill);
             }
         }
@@ -198,8 +207,15 @@ static void osd_push(eye_osd_t *o) {
 
 static void *osd_thread(void *arg) {
     eye_osd_t *o = arg;
+    time_t last = 0;
     while (atomic_load(&o->running)) {
         time_t now = time(NULL);
+        bool forced = atomic_exchange(&o->update_pending, false);
+        if (!forced && now == last) {
+            usleep(100000); /* 100ms wake; re-render on the next second or update */
+            continue;
+        }
+        last = now;
         struct tm tm;
         localtime_r(&now, &tm);
         char s[32];
@@ -211,7 +227,6 @@ static void *osd_thread(void *arg) {
             osd_render(o, s);
             osd_push(o);
         }
-        for (int i = 0; i < 10 && atomic_load(&o->running); i++) usleep(100000);
     }
     return NULL;
 }
@@ -251,6 +266,7 @@ eye_osd_t *eye_osd_start(int venc_channel, int frame_w, int frame_h,
                          int rotation, int scale, int color) {
     eye_osd_t *o = calloc(1, sizeof(*o));
     if (o == NULL) return NULL;
+    atomic_store(&o->update_pending, false);
     o->venc_channel = venc_channel;
     o->frame_w = frame_w;
     o->frame_h = frame_h;
@@ -290,6 +306,15 @@ eye_osd_t *eye_osd_start(int venc_channel, int frame_w, int frame_h,
     }
     o->started = true;
     return o;
+}
+
+void eye_osd_set_color(eye_osd_t *o, int color) {
+    if (o == NULL) return;
+    if (color < EYE_OSD_WHITE) color = EYE_OSD_WHITE;
+    if (color > EYE_OSD_COLOR_MAX) color = EYE_OSD_COLOR_MAX;
+    if (color == o->color) return;
+    o->color = color;
+    atomic_store(&o->update_pending, true);
 }
 
 void eye_osd_stop(eye_osd_t *o) {
