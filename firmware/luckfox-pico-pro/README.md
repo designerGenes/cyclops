@@ -8,7 +8,7 @@ The Raspberry Pi Eye depended on Python, `picamera2`, `vcgencmd`, and MediaMTX's
 
 - MPP VI receives ISP output through DMABUF and binds it to the RV1106 H.264 VENC hardware.
 - The vendor `rtsp_demo` library publishes `/cam` (primary) and `/detect` (NPU/detection) streams. Cyclops retains its current `cam` and `detect` node contract and port `8554`.
-- The primary pipeline starts at 1920×1080/15fps/2Mbps; the detection pipeline is independently capped at 640×360/8fps/800Kbps so analytics do not burn encoder capacity unnecessarily.
+- The primary pipeline starts at 1280×720/15fps/1.5Mbps; the detection pipeline is independently capped at 640×360/8fps/800Kbps so analytics do not burn encoder capacity unnecessarily. The 720p encode keeps the single-core SoC well inside its real-time budget (1080p caused encoder frame-drop bursts that broke clean delivery).
 - The thermal governor reads Linux thermal sysfs rather than Raspberry Pi `vcgencmd`. It downshifts immediately at 70°C, 78°C, and 84°C, requires 120 seconds of cool dwell to recover, and prevents manual FPS/tier requests from overriding a thermal reduction.
 - Registration and heartbeat payloads match the existing Cyclops `/api/nodes/register` and `/api/nodes/heartbeat` contract. They advertise the local LAN address so the coordinator can keep using LAN-direct RTSP.
 - A Buildroot/SysV init file is included because the stock LuckFox image does not use the Raspberry Pi's systemd unit model.

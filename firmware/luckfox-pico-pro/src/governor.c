@@ -9,7 +9,7 @@
  * image "fix then go green". Keep headroom so throttling only happens when the
  * SoC is genuinely hot (RK1106 Tj max is far above this). */
 static const eye_tier_t TIERS[EYE_TIER_COUNT] = {
-    {"full", 0.0, 1920, 1080, 15, 2000},
+    {"full", 0.0, 1280, 720, 15, 1500},
     {"warm", 78.0, 1280, 720, 12, 1000},
     {"hot", 84.0, 854, 480, 8, 500},
     {"critical", 90.0, 640, 360, 5, 250},

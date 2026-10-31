@@ -26,7 +26,7 @@ class Node:
     rotation: int = 0             # display rotation in degrees: 0/90/180/270
     notify: bool = True           # send presence alerts for this camera
     osd_scale: int = 6            # timestamp glyph scale (3..12)
-    osd_color: int = 0            # timestamp color mode (0=white,1=cycle,2..6 hues)
+    osd_color: int = 0            # timestamp color preset (0=white,1=yellow,2=black,3=red)
 
     # RTSP endpoints prefer the LAN route (no per-packet WireGuard crypto
     # on the thermally-limited eye); the tailnet route is the fallback.
@@ -132,7 +132,7 @@ class Registry:
             if not n:
                 return None
             n.osd_scale = max(3, min(12, int(scale)))
-            n.osd_color = max(0, min(6, int(color)))
+            n.osd_color = max(0, min(3, int(color)))
             self._save()
             return n
 

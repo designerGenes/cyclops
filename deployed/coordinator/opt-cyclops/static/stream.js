@@ -14,6 +14,8 @@ const sysIris = document.getElementById('sysIris');
 
 const tiles = new Map();
 let layout = { order: [], hidden: [] };
+/* Timestamp color presets; the per-tile color button advances through these. */
+const OSD_COLOR_NAMES = ['white', 'yellow', 'black', 'red'];
 
 /* ---------------- list / grid view ---------------- */
 const viewToggle = document.getElementById('viewToggle');
@@ -510,13 +512,13 @@ function makeTile(node) {
   });
 
   /* timestamp overlay color + size (per-eye, persisted server-side) */
-  const osdColor = el.querySelector('.osdsel select');
+  const osdColorBtn = el.querySelector('.b-osdcolor');
   const osdSize = el.querySelector('.osdsize');
   const setOsd = (scale, color, persist) => {
     t.osdScale = Math.max(3, Math.min(12, Number(scale) || 6));
-    t.osdColor = Math.max(0, Math.min(6, Number(color) || 0));
+    t.osdColor = Math.max(0, Math.min(OSD_COLOR_NAMES.length - 1, Number(color) || 0));
     osdSize.textContent = String(t.osdScale);
-    osdColor.value = String(t.osdColor);
+    osdColorBtn.textContent = `ts: ${OSD_COLOR_NAMES[t.osdColor]}`;
     if (persist) {
       fetch(`/api/nodes/${node.name}/osd`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -524,7 +526,8 @@ function makeTile(node) {
       }).catch(() => { /* telemetry will show reality */ });
     }
   };
-  osdColor.addEventListener('change', () => setOsd(t.osdScale, osdColor.value, true));
+  osdColorBtn.addEventListener('click', () =>
+    setOsd(t.osdScale, (t.osdColor + 1) % OSD_COLOR_NAMES.length, true));
   el.querySelector('.b-osd-inc').addEventListener('click', () =>
     setOsd(t.osdScale + 1, t.osdColor, true));
   el.querySelector('.b-osd-dec').addEventListener('click', () =>
@@ -579,9 +582,9 @@ function updateTile(t, node) {
   if (node.osd_scale !== undefined && node.osd_color !== undefined &&
       (node.osd_scale !== t.osdScale || node.osd_color !== t.osdColor)) {
     t.osdScale = Math.max(3, Math.min(12, Number(node.osd_scale) || 6));
-    t.osdColor = Math.max(0, Math.min(6, Number(node.osd_color) || 0));
+    t.osdColor = Math.max(0, Math.min(OSD_COLOR_NAMES.length - 1, Number(node.osd_color) || 0));
     t.el.querySelector('.osdsize').textContent = String(t.osdScale);
-    t.el.querySelector('.osdsel select').value = String(t.osdColor);
+    t.el.querySelector('.b-osdcolor').textContent = `ts: ${OSD_COLOR_NAMES[t.osdColor]}`;
   }
   t.iris.className = `iris ${irisClass(t)}`;
   t.el.classList.toggle('seen', !!node.person && node.online);

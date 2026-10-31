@@ -7,18 +7,15 @@
 #define EYE_VALUE_MAX 256
 #define EYE_NAME_MAX 64
 
-/* Timestamp OSD color modes (palette defined in osd.c). CYCLE animates the
- * fill through contrasting hues once per second so the timestamp stays vivid
- * against any scene luminance; the others are fixed high-contrast fills. */
+/* Timestamp OSD color presets, ordered for legibility (each is rendered with a
+ * contrasting outline by osd.c). The console "advances" through these on
+ * click; it is NOT an automatic loop. */
 enum {
     EYE_OSD_WHITE = 0,
-    EYE_OSD_CYCLE = 1,
-    EYE_OSD_YELLOW = 2,
-    EYE_OSD_CYAN = 3,
-    EYE_OSD_MAGENTA = 4,
-    EYE_OSD_ORANGE = 5,
-    EYE_OSD_GREEN = 6,
-    EYE_OSD_COLOR_MAX = EYE_OSD_GREEN,
+    EYE_OSD_YELLOW = 1,
+    EYE_OSD_BLACK = 2,
+    EYE_OSD_RED = 3,
+    EYE_OSD_COLOR_MAX = EYE_OSD_RED,
 };
 
 typedef struct {

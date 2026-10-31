@@ -24,7 +24,6 @@ enum { PRIMARY_CHANNEL = 0, DETECT_CHANNEL = 1, DETECT_WIDTH = 640, DETECT_HEIGH
 typedef struct {
     int vi_channel;
     int venc_channel;
-    int target_fps; /* wire frame rate the tx loop gates to */
     rtsp_session_handle session;
     rtsp_demo_handle rtsp;
     pthread_t thread;
@@ -136,44 +135,28 @@ static int stream_start(encoder_stream_t *stream, int width, int height, int fps
     venc_attr.stVencAttr.u32PicHeight = (RK_U32)height;
     venc_attr.stVencAttr.u32VirWidth = (RK_U32)width;
     venc_attr.stVencAttr.u32VirHeight = (RK_U32)height;
-    venc_attr.stVencAttr.u32StreamBufCnt = 3;
+    venc_attr.stVencAttr.u32StreamBufCnt = 6;
     venc_attr.stVencAttr.u32BufSize = (RK_U32)(width * height * 3 / 2);
     if (RK_MPI_VENC_CreateChn(stream->venc_channel, &venc_attr) != RK_SUCCESS) return -1;
     memset(&receive, 0, sizeof(receive));
     receive.s32RecvPicNum = -1;
     if (RK_MPI_VENC_StartRecvFrame(stream->venc_channel, &receive) != RK_SUCCESS ||
         RK_MPI_SYS_Bind(&source, &destination) != RK_SUCCESS) return -1;
-    stream->target_fps = fps;
     stream->configured = true;
     return 0;
-}
-
-static double monotonic_seconds(void) {
-    struct timespec value;
-    (void)clock_gettime(CLOCK_MONOTONIC, &value);
-    return (double)value.tv_sec + (double)value.tv_nsec / 1000000000.0;
 }
 
 static void *stream_frames(void *argument) {
     encoder_stream_t *stream = argument;
     VENC_STREAM_S frame;
     VENC_PACK_S pack;
-    /* Deterministic wire-rate gate: even if the SDK ignores s32DstFrameRate,
-     * never publish faster than target_fps. This stops the bursty frame drops
-     * that made the feeds choppy. */
-    const double interval = stream->target_fps > 0 ? 1.0 / (double)stream->target_fps : 0.0;
-    double last_tx = 0.0;
     memset(&frame, 0, sizeof(frame));
     frame.pstPack = &pack;
     while (atomic_load(&stream->running)) {
         if (RK_MPI_VENC_GetStream(stream->venc_channel, &frame, 200000) == RK_SUCCESS) {
-            const double now = monotonic_seconds();
-            if (interval <= 0.0 || now - last_tx >= interval) {
-                const uint8_t *data = RK_MPI_MB_Handle2VirAddr(frame.pstPack->pMbBlk);
-                if (data != NULL && stream->session != NULL)
-                    (void)rtsp_tx_video(stream->session, data, (int)frame.pstPack->u32Len, frame.pstPack->u64PTS);
-                last_tx = now;
-            }
+            const uint8_t *data = RK_MPI_MB_Handle2VirAddr(frame.pstPack->pMbBlk);
+            if (data != NULL && stream->session != NULL)
+                (void)rtsp_tx_video(stream->session, data, (int)frame.pstPack->u32Len, frame.pstPack->u64PTS);
             if (stream->rtsp != NULL) (void)rtsp_do_event(stream->rtsp);
             (void)RK_MPI_VENC_ReleaseStream(stream->venc_channel, &frame);
         }
