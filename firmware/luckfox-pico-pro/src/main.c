@@ -1,5 +1,6 @@
 #include "cyclops_eye/camera.h"
 #include "cyclops_eye/eye.h"
+#include "cyclops_eye/ntp_sync.h"
 #include "control_server.h"
 #include "http_client.h"
 
@@ -121,6 +122,13 @@ int main(int argc, char **argv) {
     osd_scale = config.osd_scale;
     osd_color = config.osd_color;
     eye_governor_init(&governor);
+    /* One-shot clock sync so the burned timestamp starts correct and the
+     * running ntpd later finds ~zero offset (no visible forward/backward
+     * step). Best-effort and bounded: non-fatal if the LAN is not up yet. */
+    for (int attempt = 0; attempt < 3; attempt++) {
+        if (eye_ntp_sync("pool.ntp.org", 2) == 0) break;
+        usleep(250000);
+    }
     if (eye_camera_start(&camera, &config, eye_tier(EYE_TIER_FULL), eye_governor_effective_fps(&governor)) != 0) {
         (void)fprintf(stderr, "cannot start RV1106 camera pipeline\n");
         return 1;
