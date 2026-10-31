@@ -7,6 +7,20 @@
 #define EYE_VALUE_MAX 256
 #define EYE_NAME_MAX 64
 
+/* Timestamp OSD color modes (palette defined in osd.c). CYCLE animates the
+ * fill through contrasting hues once per second so the timestamp stays vivid
+ * against any scene luminance; the others are fixed high-contrast fills. */
+enum {
+    EYE_OSD_WHITE = 0,
+    EYE_OSD_CYCLE = 1,
+    EYE_OSD_YELLOW = 2,
+    EYE_OSD_CYAN = 3,
+    EYE_OSD_MAGENTA = 4,
+    EYE_OSD_ORANGE = 5,
+    EYE_OSD_GREEN = 6,
+    EYE_OSD_COLOR_MAX = EYE_OSD_GREEN,
+};
+
 typedef struct {
     char node_name[EYE_NAME_MAX];
     char enroll_token[EYE_VALUE_MAX];
@@ -20,6 +34,8 @@ typedef struct {
     int thermal_poll_seconds;
     int reboot_after_unreachable_seconds;
     int rotation;   /* display rotation 0/90/180/270; OSD counter-rotates */
+    int osd_scale;  /* timestamp OSD cell scale, 3..12 (6 = default) */
+    int osd_color;  /* EYE_OSD_* timestamp color mode */
 } eye_config_t;
 
 typedef enum {
@@ -49,6 +65,10 @@ typedef struct {
 void eye_config_defaults(eye_config_t *config);
 int eye_config_load(const char *path, eye_config_t *config, char *error, size_t error_size);
 bool eye_config_is_valid(const eye_config_t *config);
+/* Persist the timestamp OSD scale and color back to the config file so they
+ * survive a reboot. Preserves all other lines; updates or appends the two
+ * osd keys. Returns 0 on success. */
+int eye_config_write_osd(const char *path, int scale, int color);
 
 const eye_tier_t *eye_tier(eye_tier_id_t id);
 void eye_governor_init(eye_governor_t *governor);

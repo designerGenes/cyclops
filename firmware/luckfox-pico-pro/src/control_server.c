@@ -68,7 +68,8 @@ int eye_control_server_start(eye_control_server_t *server, int port, const char 
 }
 
 int eye_control_server_poll(eye_control_server_t *server, eye_governor_t *governor,
-                            eye_camera_t *camera, bool camera_ready) {
+                            eye_camera_t *camera, bool camera_ready,
+                            int *osd_scale, int *osd_color) {
     char request[2048];
     int client;
     ssize_t received;
@@ -131,6 +132,36 @@ int eye_control_server_poll(eye_control_server_t *server, eye_governor_t *govern
         }
         close(client);
         return updated ? 1 : 0;
+    }
+    if (strncmp(request, "POST /osd ", 10) == 0) {
+        char scale_str[32];
+        char color_str[32];
+        char *s_end = NULL;
+        char *c_end = NULL;
+        long scale;
+        long color;
+        bool updated = false;
+        if (!authorized(request, server->token)) {
+            send_json(client, 403, "{\"error\":\"bad token\"}");
+        } else if (body_value(request, "scale", scale_str, sizeof(scale_str)) &&
+                   body_value(request, "color", color_str, sizeof(color_str))) {
+            scale = strtol(scale_str, &s_end, 10);
+            color = strtol(color_str, &c_end, 10);
+            if (s_end != scale_str && *s_end == '\0' && c_end != color_str && *c_end == '\0' &&
+                scale >= 3 && scale <= 12 &&
+                color >= EYE_OSD_WHITE && color <= EYE_OSD_COLOR_MAX) {
+                if (osd_scale != NULL) *osd_scale = (int)scale;
+                if (osd_color != NULL) *osd_color = (int)color;
+                updated = true;
+                send_json(client, 200, "{\"osd\":\"updated\"}");
+            } else {
+                send_json(client, 400, "{\"error\":\"bad osd values\"}");
+            }
+        } else {
+            send_json(client, 400, "{\"error\":\"bad request\"}");
+        }
+        close(client);
+        return updated ? 2 : 0;
     }
     send_json(client, 404, "{\"error\":\"not found\"}");
     close(client);

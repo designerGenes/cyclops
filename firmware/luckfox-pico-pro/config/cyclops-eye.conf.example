@@ -13,3 +13,9 @@ control_port=8800
 heartbeat_seconds=15
 thermal_poll_seconds=5
 reboot_after_unreachable_seconds=600
+
+# Timestamp overlay: glyph cell size in pixels (3..12; 6 is the default) and
+# color mode (0=white, 1=cycle through contrasting hues, 2=yellow, 3=cyan,
+# 4=magenta, 5=orange, 6=green).
+osd_scale=6
+osd_color=0

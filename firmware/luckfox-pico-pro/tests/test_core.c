@@ -18,15 +18,15 @@ static eye_config_t test_config(void) {
 static void test_hot_transition_is_immediate(void) {
     eye_governor_t governor;
     eye_governor_init(&governor);
-    assert(!eye_governor_step(&governor, 69.9, false, 1.0));
-    assert(eye_governor_step(&governor, 78.0, false, 2.0));
+    assert(!eye_governor_step(&governor, 77.9, false, 1.0));
+    assert(eye_governor_step(&governor, 84.0, false, 2.0));
     assert(eye_governor_effective_tier(&governor) == EYE_TIER_HOT);
 }
 
 static void test_cooling_requires_dwell(void) {
     eye_governor_t governor;
     eye_governor_init(&governor);
-    assert(eye_governor_step(&governor, 85.0, false, 0.0));
+    assert(eye_governor_step(&governor, 90.0, false, 0.0));
     assert(eye_governor_effective_tier(&governor) == EYE_TIER_CRITICAL);
     assert(!eye_governor_step(&governor, 70.0, false, 10.0));
     assert(!eye_governor_step(&governor, 70.0, false, 129.0));
@@ -40,7 +40,7 @@ static void test_manual_controls_are_a_safety_ceiling(void) {
     assert(eye_governor_set_manual_tier(&governor, "critical"));
     assert(eye_governor_effective_tier(&governor) == EYE_TIER_CRITICAL);
     assert(eye_governor_set_manual_tier(&governor, "full"));
-    assert(eye_governor_step(&governor, 85.0, false, 1.0));
+    assert(eye_governor_step(&governor, 90.0, false, 1.0));
     assert(eye_governor_effective_tier(&governor) == EYE_TIER_CRITICAL);
     assert(eye_governor_set_fps(&governor, 30));
     assert(eye_governor_effective_fps(&governor) == 5);

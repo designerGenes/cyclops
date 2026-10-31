@@ -7,7 +7,13 @@
  * The viewer applies a per-node display rotation (0/90/180/270 clockwise). To
  * keep the timestamp upright and in the top-left of what the viewer sees, the
  * text is rendered counter-rotated and attached to the corner of the sensor
- * frame that maps to the displayed top-left. */
+ * frame that maps to the displayed top-left.
+ *
+ * Color: the fill can be a fixed high-contrast hue or "cycle", which animates
+ * through a palette of saturated hues once per second. Every glyph is drawn
+ * with a thin black outline so it stays visible on both dark and light scenes.
+ * Size: an integer cell scale (3..12) controls the glyph size.
+ */
 
 #include "cyclops_eye/osd.h"
 
@@ -23,15 +29,23 @@
 #include "rk_mpi_rgn.h"
 #include "rk_common.h"
 
-/* 3x5 blocky font, scaled up. 19 chars ("YYYY-MM-DD HH:MM:SS") at 4 cells each
- * (3 glyph columns + 1 space). */
-#define OSD_SCALE 6
 #define OSD_CHARS 19
-#define OSD_ADV (4 * OSD_SCALE)
-#define OSD_W (((OSD_CHARS * OSD_ADV) + 15) / 16 * 16) /* align 16 */
-#define OSD_H 32                                        /* 5*4=20 -> align 16 */
+#define OSD_OUTLINE 2 /* thin black ring around the glyphs, in pixels */
 #define OSD_RGN_HANDLE 0
 #define OSD_MARGIN 16
+
+/* Fixed high-contrast fills, indexed by the EYE_OSD_* modes in eye.h. Index 1
+ * (CYCLE) is a placeholder: the thread picks a hue from the YELLOW..GREEN
+ * range and overwrites o->cycle_index each refresh. */
+static const uint32_t OSD_PALETTE[EYE_OSD_COLOR_MAX + 1] = {
+    0xFFFFFFFFu, /* WHITE   */
+    0xFFFFFFFFu, /* CYCLE   (unused directly) */
+    0xFFFFE400u, /* YELLOW  */
+    0xFF00E5FFu, /* CYAN    */
+    0xFFFF00E5u, /* MAGENTA */
+    0xFFFF7E00u, /* ORANGE  */
+    0xFF64FF4Au, /* GREEN   */
+};
 
 /* Each row is 3 bits, bit0 = leftmost column. */
 static const unsigned char FONT3X5[13][5] = {
@@ -62,19 +76,43 @@ struct eye_osd {
     int venc_channel;
     int frame_w;
     int frame_h;
-    int rotation;      /* 0/90/180/270 clockwise, as the viewer rotates */
-    int dst_w;         /* rendered bitmap size after counter-rotation */
+    int rotation;   /* 0/90/180/270 clockwise, as the viewer rotates */
+    int scale;      /* glyph cell size in pixels */
+    int color;      /* EYE_OSD_* mode */
+    int cycle_index;/* palette index used while color == EYE_OSD_CYCLE */
+    int text_w;     /* rendered text bitmap size */
+    int text_h;
+    int dst_w;      /* rendered bitmap size after counter-rotation */
     int dst_h;
-    uint32_t *text;    /* horizontal text, OSD_W x OSD_H */
-    uint32_t *buf;     /* counter-rotated bitmap attached to the VENC */
+    uint32_t *text; /* horizontal text, text_w x text_h */
+    uint32_t *buf;  /* counter-rotated bitmap attached to the VENC */
     pthread_t thread;
     atomic_bool running;
     bool started;
 };
 
-static void render_text(uint32_t *buf, const char *s) {
-    memset(buf, 0, (size_t)OSD_W * OSD_H * sizeof(uint32_t));
+/* Paint a solid block into `buf`, clamped to [0,text_w) x [0,text_h). */
+static void paint_block(eye_osd_t *o, int x, int y, int w, int h, uint32_t color) {
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (x + w > o->text_w) w = o->text_w - x;
+    if (y + h > o->text_h) h = o->text_h - y;
+    if (w <= 0 || h <= 0) return;
+    for (int dy = 0; dy < h; dy++) {
+        uint32_t *line = o->text + (size_t)(y + dy) * o->text_w + x;
+        for (int dx = 0; dx < w; dx++) line[dx] = color;
+    }
+}
+
+static uint32_t osd_fill_color(const eye_osd_t *o) {
+    if (o->color != EYE_OSD_CYCLE) return OSD_PALETTE[o->color];
+    return OSD_PALETTE[o->cycle_index];
+}
+
+static void render_text(eye_osd_t *o, const char *s, uint32_t fill) {
+    memset(o->text, 0, (size_t)o->text_w * o->text_h * sizeof(uint32_t));
     int x0 = 0;
+    int scale = o->scale;
     for (int i = 0; s[i] != '\0' && i < OSD_CHARS; i++) {
         int gi = glyph_index(s[i]);
         for (int row = 0; row < 5; row++) {
@@ -83,15 +121,15 @@ static void render_text(uint32_t *buf, const char *s) {
                 if (!((bits >> col) & 1u)) continue;
                 /* Glyph table encodes bit0 as the RIGHTMOST column, so reverse
                  * the column order here. */
-                int px0 = x0 + (2 - col) * OSD_SCALE;
-                int py0 = row * OSD_SCALE;
-                for (int dy = 0; dy < OSD_SCALE; dy++) {
-                    uint32_t *line = buf + (size_t)(py0 + dy) * OSD_W + px0;
-                    for (int dx = 0; dx < OSD_SCALE; dx++) line[dx] = 0xFFFFFFFFu;
-                }
+                int px = x0 + (2 - col) * scale;
+                int py = row * scale;
+                /* Black outline first (slightly larger), then the colored fill. */
+                paint_block(o, px - OSD_OUTLINE, py - OSD_OUTLINE,
+                            scale + 2 * OSD_OUTLINE, scale + 2 * OSD_OUTLINE, 0xFF000000u);
+                paint_block(o, px, py, scale, scale, fill);
             }
         }
-        x0 += OSD_ADV;
+        x0 += 4 * scale;
     }
 }
 
@@ -114,10 +152,10 @@ static void rotate_cw(const uint32_t *src, int sw, int sh,
 }
 
 static void osd_render(eye_osd_t *o, const char *s) {
-    render_text(o->text, s);
+    render_text(o, s, osd_fill_color(o));
     /* Counter-rotate the text by the viewer's rotation. */
     int deg = (360 - o->rotation) % 360;
-    rotate_cw(o->text, OSD_W, OSD_H, o->buf, deg, &o->dst_w, &o->dst_h);
+    rotate_cw(o->text, o->text_w, o->text_h, o->buf, deg, &o->dst_w, &o->dst_h);
 }
 
 static void osd_position(const eye_osd_t *o, int *x, int *y) {
@@ -166,6 +204,10 @@ static void *osd_thread(void *arg) {
         localtime_r(&now, &tm);
         char s[32];
         if (strftime(s, sizeof(s), "%Y-%m-%d %H:%M:%S", &tm) > 0) {
+            if (o->color == EYE_OSD_CYCLE) {
+                int hues = EYE_OSD_COLOR_MAX - EYE_OSD_YELLOW + 1;
+                o->cycle_index = EYE_OSD_YELLOW + (int)((unsigned)now % (unsigned)hues);
+            }
             osd_render(o, s);
             osd_push(o);
         }
@@ -206,7 +248,7 @@ static int osd_attach(eye_osd_t *o) {
 }
 
 eye_osd_t *eye_osd_start(int venc_channel, int frame_w, int frame_h,
-                         int rotation) {
+                         int rotation, int scale, int color) {
     eye_osd_t *o = calloc(1, sizeof(*o));
     if (o == NULL) return NULL;
     o->venc_channel = venc_channel;
@@ -214,9 +256,18 @@ eye_osd_t *eye_osd_start(int venc_channel, int frame_w, int frame_h,
     o->frame_h = frame_h;
     rotation = ((rotation % 360) + 360) % 360;
     o->rotation = (rotation / 90) * 90;   /* snap to 0/90/180/270 */
+    if (scale < 3) scale = 3;
+    if (scale > 12) scale = 12;
+    o->scale = scale;
+    if (color < EYE_OSD_WHITE) color = EYE_OSD_WHITE;
+    if (color > EYE_OSD_COLOR_MAX) color = EYE_OSD_COLOR_MAX;
+    o->color = color;
+    o->cycle_index = EYE_OSD_YELLOW;
+    o->text_w = ((OSD_CHARS * 4 * scale) + 15) / 16 * 16;   /* align 16 */
+    o->text_h = ((5 * scale) + 15) / 16 * 16;               /* align 16 */
     o->handle = OSD_RGN_HANDLE;
-    o->text = calloc((size_t)OSD_W * OSD_H, sizeof(uint32_t));
-    o->buf = calloc((size_t)OSD_W * OSD_H, sizeof(uint32_t));
+    o->text = calloc((size_t)o->text_w * o->text_h, sizeof(uint32_t));
+    o->buf = calloc((size_t)o->text_w * o->text_h, sizeof(uint32_t));
     if (o->text == NULL || o->buf == NULL) {
         free(o->text); free(o->buf); free(o);
         return NULL;

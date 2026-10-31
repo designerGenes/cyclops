@@ -44,6 +44,8 @@ struct eye_camera {
     int rotation;          /* display rotation the OSD counter-rotates for */
     int frame_w;
     int frame_h;
+    int osd_scale;         /* timestamp OSD glyph scale (3..12) */
+    int osd_color;         /* timestamp OSD color mode (EYE_OSD_*) */
 };
 
 /* The Rockchip ISP is a separate owner from the VI/VENC MPP pipeline. It
@@ -223,7 +225,7 @@ static int camera_start_streams(eye_camera_t *camera, const eye_tier_t *tier, in
     camera->frame_w = tier->width;
     camera->frame_h = tier->height;
     camera->osd = eye_osd_start(PRIMARY_CHANNEL, camera->frame_w, camera->frame_h,
-                                camera->rotation);
+                                camera->rotation, camera->osd_scale, camera->osd_color);
     return 0;
 }
 
@@ -233,6 +235,8 @@ int eye_camera_start(eye_camera_t **out_camera, const eye_config_t *config, cons
     if (camera == NULL) return -1;
     camera->config = config;
     camera->rotation = config->rotation;
+    camera->osd_scale = config->osd_scale;
+    camera->osd_color = config->osd_color;
     if (isp_start(camera) != 0 || RK_MPI_SYS_Init() != RK_SUCCESS ||
         vi_device_start() != 0) goto failed;
     camera->system_initialized = true;
@@ -263,7 +267,22 @@ int eye_camera_set_rotation(eye_camera_t *camera, int rotation) {
     camera->rotation = rotation;
     eye_osd_stop(camera->osd);
     camera->osd = eye_osd_start(PRIMARY_CHANNEL, camera->frame_w, camera->frame_h,
-                                camera->rotation);
+                                camera->rotation, camera->osd_scale, camera->osd_color);
+    return camera->osd != NULL ? 0 : -1;
+}
+
+int eye_camera_set_osd(eye_camera_t *camera, int scale, int color) {
+    if (camera == NULL) return -1;
+    if (scale < 3) scale = 3;
+    if (scale > 12) scale = 12;
+    if (color < EYE_OSD_WHITE) color = EYE_OSD_WHITE;
+    if (color > EYE_OSD_COLOR_MAX) color = EYE_OSD_COLOR_MAX;
+    if (scale == camera->osd_scale && color == camera->osd_color && camera->osd != NULL) return 0;
+    camera->osd_scale = scale;
+    camera->osd_color = color;
+    eye_osd_stop(camera->osd);
+    camera->osd = eye_osd_start(PRIMARY_CHANNEL, camera->frame_w, camera->frame_h,
+                                camera->rotation, camera->osd_scale, camera->osd_color);
     return camera->osd != NULL ? 0 : -1;
 }
 

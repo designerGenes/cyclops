@@ -110,12 +110,16 @@ int main(int argc, char **argv) {
     bool registered = false;
     int applied_tier = EYE_TIER_FULL;
     int applied_fps = -1;
+    int osd_scale = 6;
+    int osd_color = EYE_OSD_WHITE;
 
     if (eye_config_load(config_path, &config, error, sizeof(error)) != 0) {
         (void)fprintf(stderr, "configuration error: %s\n", error);
         return 1;
     }
     if (config.advertise_host[0] == '\0') discover_lan_ip(config.advertise_host, sizeof(config.advertise_host));
+    osd_scale = config.osd_scale;
+    osd_color = config.osd_color;
     eye_governor_init(&governor);
     if (eye_camera_start(&camera, &config, eye_tier(EYE_TIER_FULL), eye_governor_effective_fps(&governor)) != 0) {
         (void)fprintf(stderr, "cannot start RV1106 camera pipeline\n");
@@ -144,7 +148,10 @@ int main(int argc, char **argv) {
     double next_watchdog = started;
     while (keep_running) {
         double now = monotonic_seconds();
-        if (eye_control_server_poll(&control, &governor, camera, eye_camera_ready(camera)) > 0) {
+        int control_change = eye_control_server_poll(&control, &governor, camera,
+                                                     eye_camera_ready(camera),
+                                                     &osd_scale, &osd_color);
+        if (control_change == 1) {
             int want_tier = eye_governor_effective_tier(&governor);
             int want_fps = eye_governor_effective_fps(&governor);
             if (want_tier != applied_tier || want_fps != applied_fps) {
@@ -152,6 +159,14 @@ int main(int argc, char **argv) {
                     (void)fprintf(stderr, "camera control reconfiguration failed\n");
                 applied_tier = want_tier;
                 applied_fps = want_fps;
+            }
+        } else if (control_change == 2) {
+            if (eye_camera_set_osd(camera, osd_scale, osd_color) == 0) {
+                /* Persist so the choice survives a reboot. */
+                if (eye_config_write_osd(config_path, osd_scale, osd_color) != 0)
+                    (void)fprintf(stderr, "OSD config write-back failed\n");
+            } else {
+                (void)fprintf(stderr, "OSD update failed\n");
             }
         }
         if (now >= next_thermal) {

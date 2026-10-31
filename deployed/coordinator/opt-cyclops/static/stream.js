@@ -197,6 +197,7 @@ function makeTile(node) {
     whepFails: 0, useHlsFallback: false,
     zoom: 1, panX: 0, panY: 0,
     rotation: ((node.rotation || 0) % 360),
+    osdScale: 6, osdColor: 0,
     video: el.querySelector('video'),
     canvas: el.querySelector('canvas'),
     source: null, raf: null, rotatePipeline: false,
@@ -508,6 +509,28 @@ function makeTile(node) {
     } catch { /* telemetry will show reality */ }
   });
 
+  /* timestamp overlay color + size (per-eye, persisted server-side) */
+  const osdColor = el.querySelector('.osdsel select');
+  const osdSize = el.querySelector('.osdsize');
+  const setOsd = (scale, color, persist) => {
+    t.osdScale = Math.max(3, Math.min(12, Number(scale) || 6));
+    t.osdColor = Math.max(0, Math.min(6, Number(color) || 0));
+    osdSize.textContent = String(t.osdScale);
+    osdColor.value = String(t.osdColor);
+    if (persist) {
+      fetch(`/api/nodes/${node.name}/osd`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scale: t.osdScale, color: t.osdColor }),
+      }).catch(() => { /* telemetry will show reality */ });
+    }
+  };
+  osdColor.addEventListener('change', () => setOsd(t.osdScale, osdColor.value, true));
+  el.querySelector('.b-osd-inc').addEventListener('click', () =>
+    setOsd(t.osdScale + 1, t.osdColor, true));
+  el.querySelector('.b-osd-dec').addEventListener('click', () =>
+    setOsd(t.osdScale - 1, t.osdColor, true));
+  setOsd(node.osd_scale, node.osd_color, false);
+
   /* hide */
   el.querySelector('.b-hide').addEventListener('click', () => {
     if (!layout.hidden.includes(node.name)) layout.hidden.push(node.name);
@@ -552,6 +575,13 @@ function updateTile(t, node) {
   }
   if (typeof node.rotation === 'number' && node.rotation !== t.rotation) {
     t.setRotation(node.rotation, false);   // reflect changes from other clients
+  }
+  if (node.osd_scale !== undefined && node.osd_color !== undefined &&
+      (node.osd_scale !== t.osdScale || node.osd_color !== t.osdColor)) {
+    t.osdScale = Math.max(3, Math.min(12, Number(node.osd_scale) || 6));
+    t.osdColor = Math.max(0, Math.min(6, Number(node.osd_color) || 0));
+    t.el.querySelector('.osdsize').textContent = String(t.osdScale);
+    t.el.querySelector('.osdsel select').value = String(t.osdColor);
   }
   t.iris.className = `iris ${irisClass(t)}`;
   t.el.classList.toggle('seen', !!node.person && node.online);

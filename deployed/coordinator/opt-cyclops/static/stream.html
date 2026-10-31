@@ -55,6 +55,20 @@
       <button class="b-fit" title="reset zoom">fit</button>
       <button class="b-rot" title="rotate 90° clockwise">⟳</button>
       <span class="rotval" title="display rotation">0°</span>
+      <label class="osdsel" title="timestamp color">timestamp
+        <select>
+          <option value="0">white</option>
+          <option value="1">cycle</option>
+          <option value="2">yellow</option>
+          <option value="3">cyan</option>
+          <option value="4">magenta</option>
+          <option value="5">orange</option>
+          <option value="6">green</option>
+        </select>
+      </label>
+      <button class="b-osd-dec" title="smaller timestamp">A−</button>
+      <span class="osdsize" title="timestamp size">6</span>
+      <button class="b-osd-inc" title="larger timestamp">A+</button>
       <label class="tiersel">tier
         <select>
           <option value="auto">auto</option>
@@ -79,6 +93,6 @@
   </article>
 </template>
 
-<script src="/static/stream.js?v=17"></script>
+<script src="/static/stream.js?v=18"></script>
 </body>
 </html>

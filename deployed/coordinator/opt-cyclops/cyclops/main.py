@@ -214,6 +214,11 @@ class NotifyBody(BaseModel):
     enabled: bool = True
 
 
+class OsdBody(BaseModel):
+    scale: int = 6
+    color: int = 0
+
+
 def _check_token(token: str) -> None:
     if token != cfg.enroll_token:
         raise HTTPException(403, "bad enroll token")
@@ -278,6 +283,8 @@ def list_nodes():
             "uptime_s": n.uptime_s,
             "rotation": n.rotation,
             "notify": n.notify,
+            "osd_scale": n.osd_scale,
+            "osd_color": n.osd_color,
             "online": online,
             "heartbeat_age_s": round(now - n.last_seen, 1),
             "stream_ready": _stream_ready(n.name) if online else False,
@@ -353,6 +360,24 @@ def set_notify(name: str, body: NotifyBody):
     if node is None:
         raise HTTPException(404, "unknown node")
     return {"ok": True, "notify": node.notify}
+
+
+@app.post("/api/nodes/{name}/osd")
+def set_osd(name: str, body: OsdBody):
+    """Persist a per-node timestamp scale/color and forward it to the eye so
+    its burned-in timestamp overlay updates live."""
+    if not SAFE_NAME.match(name) or name not in {n.name for n in registry.all()}:
+        raise HTTPException(404, "unknown node")
+    node = registry.set_osd(name, body.scale, body.color)
+    if node is None:
+        raise HTTPException(404, "unknown node")
+    try:
+        _rq.post(f"http://{node.host}:8800/osd",
+                 json={"scale": str(node.osd_scale), "color": str(node.osd_color)},
+                 headers={"X-Camnode-Token": cfg.enroll_token}, timeout=5)
+    except Exception as e:
+        print(f"[osd] {name}: timestamp OSD update failed: {e}", flush=True)
+    return {"ok": True, "osd_scale": node.osd_scale, "osd_color": node.osd_color}
 
 
 @app.post("/api/nodes/{name}/restart-proxy")
