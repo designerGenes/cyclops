@@ -218,6 +218,10 @@ function makeTile(node) {
      the tile's <canvas>, and let the visible video play canvas.captureStream(). */
   const enableRotatePipeline = () => {
     if (t.rotatePipeline) return;
+    /* iOS Safari can't play a canvas.captureStream() alongside native HLS
+     * reliably - it renders a blank tile. iOS keyboard/pointer rotation is
+     * handled by the CSS transform branch in applyZoom() instead. */
+    if (isIOS) return;
     t.source = document.createElement('video');
     t.source.autoplay = true;
     t.source.muted = true;
