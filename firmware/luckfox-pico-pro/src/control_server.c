@@ -34,10 +34,15 @@ static bool body_value(const char *request, const char *key, char *value, size_t
     char pattern[64];
     const char *start;
     const char *end;
-    if (snprintf(pattern, sizeof(pattern), "\"%s\":\"", key) < 0) return false;
+    if (snprintf(pattern, sizeof(pattern), "\"%s\":", key) < 0) return false;
     start = strstr(request, pattern);
     if (start == NULL) return false;
     start += strlen(pattern);
+    /* Tolerate the whitespace requests-style JSON inserts after the colon
+     * ("key": "value") as well as the compact form ("key":"value"). */
+    while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n') start++;
+    if (*start != '\"') return false;
+    start++;
     end = strchr(start, '"');
     if (end == NULL || end == start || (size_t)(end - start) >= value_size) return false;
     memcpy(value, start, (size_t)(end - start));
